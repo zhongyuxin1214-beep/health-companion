@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from "recharts";
+import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from "recharts";
 import { X, TrendingUp } from "lucide-react";
 
 const weekData = [
@@ -28,15 +28,15 @@ const TrendChart = ({ onClose }: TrendChartProps) => {
   const data = view === "week" ? weekData : monthData;
 
   return (
-    <div className="fixed inset-0 bg-foreground/40 z-50 flex items-end justify-center" onClick={onClose}>
-      <div className="bg-card w-full max-w-md rounded-t-3xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="bg-card w-full max-w-md rounded-t-[2rem] p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            <h3 className="font-semibold text-lg">趋势分析</h3>
+            <TrendingUp className="w-5 h-5 text-secondary" />
+            <h3 className="font-bold text-lg text-foreground">趋势分析</h3>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
@@ -45,8 +45,8 @@ const TrendChart = ({ onClose }: TrendChartProps) => {
             <button
               key={v}
               onClick={() => setView(v)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                view === v ? "gradient-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${
+                view === v ? "gradient-teal text-secondary-foreground shadow-glow-teal" : "bg-muted text-muted-foreground"
               }`}
             >
               {v === "week" ? "本周" : "本月"}
@@ -56,11 +56,11 @@ const TrendChart = ({ onClose }: TrendChartProps) => {
 
         <div className="flex gap-4 mb-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-primary/70" />
+            <div className="w-3 h-3 rounded-sm bg-secondary/70" />
             <span>热量 (kcal)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-1 rounded-full bg-accent" />
+            <div className="w-3 h-1 rounded-full bg-primary" />
             <span>体重 (kg)</span>
           </div>
         </div>
@@ -68,20 +68,21 @@ const TrendChart = ({ onClose }: TrendChartProps) => {
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(150 15% 90%)" />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(160 10% 45%)" />
-              <YAxis yAxisId="cal" tick={{ fontSize: 10 }} stroke="hsl(160 10% 45%)" />
-              <YAxis yAxisId="wt" orientation="right" domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 10 }} stroke="hsl(160 10% 45%)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(20 6% 25%)" />
+              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "hsl(20 10% 50%)" }} stroke="hsl(20 6% 25%)" />
+              <YAxis yAxisId="cal" tick={{ fontSize: 10, fill: "hsl(20 10% 50%)" }} stroke="hsl(20 6% 25%)" />
+              <YAxis yAxisId="wt" orientation="right" domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 10, fill: "hsl(20 10% 50%)" }} stroke="hsl(20 6% 25%)" />
               <Tooltip
                 contentStyle={{
-                  background: "hsl(0 0% 100%)",
-                  border: "1px solid hsl(150 15% 90%)",
-                  borderRadius: "12px",
+                  background: "hsl(20 8% 16%)",
+                  border: "1px solid hsl(20 6% 25%)",
+                  borderRadius: "16px",
                   fontSize: "12px",
+                  color: "hsl(0 0% 90%)",
                 }}
               />
-              <Bar yAxisId="cal" dataKey="calories" fill="hsl(158 64% 40% / 0.6)" radius={[6, 6, 0, 0]} />
-              <Line yAxisId="wt" type="monotone" dataKey="weight" stroke="hsl(35 90% 55%)" strokeWidth={2.5} dot={{ fill: "hsl(35 90% 55%)", r: 4 }} />
+              <Bar yAxisId="cal" dataKey="calories" fill="hsl(174 55% 35% / 0.7)" radius={[8, 8, 0, 0]} />
+              <Line yAxisId="wt" type="monotone" dataKey="weight" stroke="hsl(350 72% 62%)" strokeWidth={2.5} dot={{ fill: "hsl(350 72% 62%)", r: 4 }} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

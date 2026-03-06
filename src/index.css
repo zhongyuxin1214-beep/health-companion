@@ -2,46 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
 
 @layer base {
   :root {
-    --background: 150 20% 97%;
-    --foreground: 160 30% 10%;
+    --background: 20 10% 12%;
+    --foreground: 0 0% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 160 30% 10%;
+    --card: 20 8% 16%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 160 30% 10%;
+    --popover: 20 8% 16%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 158 64% 40%;
+    --primary: 350 72% 62%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 150 25% 93%;
-    --secondary-foreground: 160 30% 15%;
+    --secondary: 174 55% 35%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 150 15% 94%;
-    --muted-foreground: 160 10% 45%;
+    --muted: 20 6% 22%;
+    --muted-foreground: 20 10% 60%;
 
-    --accent: 35 90% 55%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 42 90% 60%;
+    --accent-foreground: 42 90% 15%;
 
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 150 15% 90%;
-    --input: 150 15% 88%;
-    --ring: 158 64% 40%;
+    --border: 20 6% 25%;
+    --input: 20 6% 22%;
+    --ring: 350 72% 62%;
 
-    --radius: 1rem;
+    --radius: 1.25rem;
 
-    --coach: 210 80% 55%;
+    --coral: 12 80% 65%;
+    --coral-light: 12 85% 75%;
+    --teal: 174 55% 35%;
+    --teal-light: 174 45% 45%;
+    --cream: 35 50% 90%;
+    --coach: 174 55% 35%;
     --coach-foreground: 0 0% 100%;
-    --coach-bg: 210 60% 96%;
-
-    --success: 145 60% 42%;
-    --warning: 35 90% 55%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -61,33 +62,42 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    font-family: 'Nunito', system-ui, sans-serif;
   }
 }
 
 @layer utilities {
-  .gradient-primary {
-    background: linear-gradient(135deg, hsl(158 64% 40%), hsl(170 55% 45%));
-  }
   .gradient-header {
-    background: linear-gradient(135deg, hsl(158 64% 32%), hsl(170 50% 28%));
+    background: linear-gradient(135deg, hsl(350 72% 62%), hsl(12 80% 65%));
+  }
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(350 72% 62%), hsl(12 85% 70%));
+  }
+  .gradient-teal {
+    background: linear-gradient(135deg, hsl(174 55% 35%), hsl(180 50% 40%));
   }
   .gradient-accent {
-    background: linear-gradient(135deg, hsl(35 90% 55%), hsl(25 95% 58%));
+    background: linear-gradient(135deg, hsl(42 90% 60%), hsl(35 95% 55%));
   }
   .gradient-coach {
-    background: linear-gradient(135deg, hsl(210 60% 96%), hsl(200 50% 95%));
+    background: linear-gradient(135deg, hsl(174 40% 22%), hsl(180 35% 25%));
   }
   .shadow-card {
-    box-shadow: 0 4px 20px -4px hsl(158 64% 40% / 0.08);
+    box-shadow: 0 4px 24px -6px hsl(0 0% 0% / 0.3);
   }
   .shadow-elevated {
-    box-shadow: 0 8px 30px -8px hsl(158 64% 40% / 0.12);
+    box-shadow: 0 8px 32px -8px hsl(0 0% 0% / 0.4);
+  }
+  .shadow-glow-pink {
+    box-shadow: 0 4px 20px -4px hsl(350 72% 62% / 0.4);
+  }
+  .shadow-glow-teal {
+    box-shadow: 0 4px 20px -4px hsl(174 55% 35% / 0.4);
   }
   .gauge-track {
-    background: hsl(150 15% 90%);
+    background: hsl(20 6% 25%);
   }
   .gauge-fill {
-    background: linear-gradient(90deg, hsl(158 64% 45%), hsl(145 60% 42%));
+    background: linear-gradient(90deg, hsl(174 55% 35%), hsl(174 45% 45%));
   }
 }

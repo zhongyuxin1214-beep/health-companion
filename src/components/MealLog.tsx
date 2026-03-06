@@ -24,40 +24,43 @@ const mealTypeEmoji: Record<string, string> = {
 const MealLog = ({ meals, onEdit, onOilCalibrate }: MealLogProps) => {
   return (
     <div className="mx-4 mt-4">
-      <h2 className="font-semibold text-base mb-3">今日饮食记录</h2>
-      <div className="bg-card rounded-2xl shadow-card overflow-hidden divide-y divide-border">
+      <h2 className="font-bold text-base mb-3 text-foreground">今日饮食记录</h2>
+      <div className="space-y-2.5">
         {meals.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground text-sm">
+          <div className="bg-card rounded-2xl p-8 text-center text-muted-foreground text-sm shadow-card">
             还没有记录，点击下方按钮开始添加 🍽️
           </div>
         ) : (
           meals.map((meal) => (
-            <div key={meal.id} className="flex items-center px-4 py-3.5 gap-3">
-              <span className="text-xl">{mealTypeEmoji[meal.type] || "🍽️"}</span>
+            <div key={meal.id} className="bg-card rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-card">
+              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl">
+                {mealTypeEmoji[meal.type] || "🍽️"}
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground font-medium">{meal.type}</span>
+                  <span className="text-xs text-muted-foreground font-semibold">{meal.type}</span>
                   {meal.oilMultiplier && meal.oilMultiplier > 1 && (
-                    <span className="text-xs bg-accent/15 text-accent-foreground px-1.5 py-0.5 rounded-full font-medium">
-                      {meal.oilMultiplier}x油
+                    <span className="text-xs gradient-accent text-accent-foreground px-1.5 py-0.5 rounded-full font-bold">
+                      {meal.oilMultiplier}x
                     </span>
                   )}
                 </div>
-                <p className="font-medium text-sm truncate">{meal.name}</p>
+                <p className="font-semibold text-sm truncate text-foreground">{meal.name}</p>
               </div>
-              <span className="font-bold text-sm tabular-nums">
-                {Math.round(meal.calories * (meal.oilMultiplier || 1))} kcal
+              <span className="font-extrabold text-sm tabular-nums text-primary">
+                {Math.round(meal.calories * (meal.oilMultiplier || 1))}
+                <span className="text-xs font-medium text-muted-foreground ml-0.5">kcal</span>
               </span>
-              <div className="flex gap-1">
+              <div className="flex gap-1.5">
                 <button
                   onClick={() => onEdit(meal.id)}
-                  className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
+                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center hover:bg-border transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
                 <button
                   onClick={() => onOilCalibrate(meal.id)}
-                  className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
+                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center hover:bg-border transition-colors"
                 >
                   <ChefHat className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
