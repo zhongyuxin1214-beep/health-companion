@@ -39,6 +39,13 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        coach: {
+          DEFAULT: "hsl(var(--coach))",
+          foreground: "hsl(var(--coach-foreground))",
+          bg: "hsl(var(--coach-bg))",
+        },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
