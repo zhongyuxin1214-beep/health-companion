@@ -17,7 +17,7 @@ const initialMeals: Meal[] = [
   { id: "2", type: "午餐", name: "外卖鸡肉饭", calories: 600, oilMultiplier: 1.3 },
 ];
 
-const getCoachMessage = (consumed: number, target: number, meals: Meal[]) => {
+const getCoachMessage = (consumed: number, target: number, _meals: Meal[]) => {
   const remaining = target - consumed;
   if (consumed === 0) return "新的一天开始了！记得记录每一餐，精确控卡从早餐开始 💪";
   if (remaining < 0) return `今日已超标 ${Math.abs(remaining)} kcal。建议下一餐以蔬菜沙拉为主，或增加30分钟有氧运动来平衡。`;
@@ -79,9 +79,9 @@ const Index = () => {
 
       <button
         onClick={() => setShowTrend(true)}
-        className="mx-4 mt-4 w-[calc(100%-2rem)] flex items-center justify-center gap-2 py-3 rounded-2xl bg-secondary text-secondary-foreground text-sm font-medium hover:bg-muted transition-colors"
+        className="mx-4 mt-4 w-[calc(100%-2rem)] flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-card text-muted-foreground text-sm font-bold hover:bg-muted transition-colors shadow-card"
       >
-        <TrendingUp className="w-4 h-4" />
+        <TrendingUp className="w-4 h-4 text-secondary" />
         查看周/月趋势图
       </button>
 

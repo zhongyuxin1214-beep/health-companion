@@ -42,10 +42,9 @@ export default {
         coach: {
           DEFAULT: "hsl(var(--coach))",
           foreground: "hsl(var(--coach-foreground))",
-          bg: "hsl(var(--coach-bg))",
         },
-        success: "hsl(var(--success))",
-        warning: "hsl(var(--warning))",
+        coral: "hsl(var(--coral))",
+        teal: "hsl(var(--teal))",
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
