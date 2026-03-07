@@ -84,7 +84,28 @@ const CalorieDashboard = ({ consumed, target, onTargetChange }: CalorieDashboard
         </div>
         <div className="text-center">
           <div className="w-2 h-2 rounded-full bg-accent mx-auto mb-1" />
-          <p className="text-lg font-bold text-foreground">{target}</p>
+          {editingTarget ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={targetValue}
+                onChange={(e) => setTargetValue(e.target.value)}
+                className="w-16 text-center text-lg font-bold bg-muted rounded-lg px-1 py-0.5 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && handleTargetSave()}
+              />
+              <button onClick={handleTargetSave} className="w-6 h-6 rounded-full gradient-teal flex items-center justify-center">
+                <Check className="w-3 h-3 text-secondary-foreground" />
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => { setTargetValue(target.toString()); setEditingTarget(true); }} className="group">
+              <p className="text-lg font-bold text-foreground group-hover:text-accent transition-colors flex items-center gap-1">
+                {target}
+                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity" />
+              </p>
+            </button>
+          )}
           <p className="text-xs text-muted-foreground">目标</p>
         </div>
       </div>
