@@ -5,17 +5,41 @@ import AICoach from "@/components/AICoach";
 import MealLog, { type Meal } from "@/components/MealLog";
 import BottomNav from "@/components/BottomNav";
 import OilSlider from "@/components/OilSlider";
-import TrendChart from "@/components/TrendChart";
+import WeightInput from "@/components/WeightInput";
+import DataView from "@/components/DataView";
 import AddMealDialog from "@/components/AddMealDialog";
-import { TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
-const TARGET_CALORIES = 1800;
+const DEFAULT_TARGET = 1800;
 
 const initialMeals: Meal[] = [
   { id: "1", type: "早餐", name: "煎蛋吐司 + 牛奶", calories: 350 },
   { id: "2", type: "午餐", name: "外卖鸡肉饭", calories: 600, oilMultiplier: 1.3 },
 ];
+
+// Generate mock historical records for demo
+const generateMockRecords = () => {
+  const records: Array<{ date: string; calories: number; weight?: number; meals: Meal[] }> = [];
+  const today = new Date();
+  for (let i = 30; i >= 1; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const cal = Math.round(1400 + Math.random() * 800);
+    const w = +(68.5 - i * 0.03 + Math.random() * 0.4).toFixed(1);
+    records.push({
+      date: dateStr,
+      calories: cal,
+      weight: w,
+      meals: [
+        { id: `${i}-1`, type: "早餐", name: "早餐", calories: Math.round(cal * 0.25) },
+        { id: `${i}-2`, type: "午餐", name: "午餐", calories: Math.round(cal * 0.4) },
+        { id: `${i}-3`, type: "晚餐", name: "晚餐", calories: Math.round(cal * 0.35) },
+      ],
+    });
+  }
+  return records;
+};
 
 const getCoachMessage = (consumed: number, target: number, _meals: Meal[]) => {
   const remaining = target - consumed;
@@ -28,15 +52,26 @@ const getCoachMessage = (consumed: number, target: number, _meals: Meal[]) => {
 
 const Index = () => {
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
+  const [targetCalories, setTargetCalories] = useState(DEFAULT_TARGET);
+  const [todayWeight, setTodayWeight] = useState<number | null>(null);
   const [showOilSlider, setShowOilSlider] = useState<string | null>(null);
-  const [showTrend, setShowTrend] = useState(false);
+  const [showDataView, setShowDataView] = useState(false);
   const [showAddMeal, setShowAddMeal] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
+  const [historicalRecords] = useState(generateMockRecords);
 
   const totalConsumed = meals.reduce(
     (sum, m) => sum + Math.round(m.calories * (m.oilMultiplier || 1)),
     0
   );
+
+  // Build today's record for data view
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const allRecords = [
+    ...historicalRecords,
+    { date: todayStr, calories: totalConsumed, weight: todayWeight ?? undefined, meals },
+  ];
 
   const handleAddMeal = (meal: { type: string; name: string; calories: number }) => {
     if (editingMeal) {
@@ -46,10 +81,7 @@ const Index = () => {
       setEditingMeal(null);
       toast.success("已更新记录");
     } else {
-      const newMeal: Meal = {
-        id: Date.now().toString(),
-        ...meal,
-      };
+      const newMeal: Meal = { id: Date.now().toString(), ...meal };
       setMeals((prev) => [...prev, newMeal]);
       toast.success("已添加记录");
     }
@@ -73,22 +105,15 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background max-w-md mx-auto relative pb-28">
       <AppHeader name="Elizabeth" streak={12} />
-      <CalorieDashboard consumed={totalConsumed} target={TARGET_CALORIES} />
-      <AICoach message={getCoachMessage(totalConsumed, TARGET_CALORIES, meals)} />
+      <CalorieDashboard consumed={totalConsumed} target={targetCalories} onTargetChange={setTargetCalories} />
+      <WeightInput todayWeight={todayWeight} onSave={setTodayWeight} />
+      <AICoach message={getCoachMessage(totalConsumed, targetCalories, meals)} />
       <MealLog meals={meals} onEdit={handleEdit} onOilCalibrate={(id) => setShowOilSlider(id)} />
-
-      <button
-        onClick={() => setShowTrend(true)}
-        className="mx-4 mt-4 w-[calc(100%-2rem)] flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-card text-muted-foreground text-sm font-bold hover:bg-muted transition-colors shadow-card"
-      >
-        <TrendingUp className="w-4 h-4 text-secondary" />
-        查看周/月趋势图
-      </button>
 
       <BottomNav
         onAddPhoto={() => { setEditingMeal(null); setShowAddMeal(true); }}
         onVoice={() => toast.info("语音补录功能需要连接 AI 服务后启用")}
-        onStats={() => setShowTrend(true)}
+        onStats={() => setShowDataView(true)}
       />
 
       {showOilSlider && (
@@ -98,7 +123,13 @@ const Index = () => {
           onClose={() => setShowOilSlider(null)}
         />
       )}
-      {showTrend && <TrendChart onClose={() => setShowTrend(false)} />}
+      {showDataView && (
+        <DataView
+          onClose={() => setShowDataView(false)}
+          target={targetCalories}
+          records={allRecords}
+        />
+      )}
       {showAddMeal && (
         <AddMealDialog
           onClose={() => { setShowAddMeal(false); setEditingMeal(null); }}
