@@ -11,6 +11,18 @@ interface CalorieDashboardProps {
 const CalorieDashboard = ({ consumed, target, onTargetChange }: CalorieDashboardProps) => {
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetValue, setTargetValue] = useState(target.toString());
+
+  const handleTargetSave = () => {
+    const v = parseInt(targetValue);
+    if (isNaN(v) || v < 500 || v > 5000) {
+      toast.error("请输入合理的热量目标 (500-5000)");
+      return;
+    }
+    onTargetChange(v);
+    setEditingTarget(false);
+    toast.success("目标已更新");
+  };
+
   const remaining = Math.max(0, target - consumed);
   const progress = Math.min((consumed / target) * 100, 100);
   const isOver = consumed > target;
