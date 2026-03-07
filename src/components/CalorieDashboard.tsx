@@ -1,9 +1,16 @@
+import { useState } from "react";
+import { Pencil, Check } from "lucide-react";
+import { toast } from "sonner";
+
 interface CalorieDashboardProps {
   consumed: number;
   target: number;
+  onTargetChange: (newTarget: number) => void;
 }
 
-const CalorieDashboard = ({ consumed, target }: CalorieDashboardProps) => {
+const CalorieDashboard = ({ consumed, target, onTargetChange }: CalorieDashboardProps) => {
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetValue, setTargetValue] = useState(target.toString());
   const remaining = Math.max(0, target - consumed);
   const progress = Math.min((consumed / target) * 100, 100);
   const isOver = consumed > target;
