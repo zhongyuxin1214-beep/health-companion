@@ -1,0 +1,4 @@
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.daily_recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.workout_shots ENABLE ROW LEVEL SECURITY;

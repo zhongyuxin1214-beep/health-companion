@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+
+@layer base {
+  :root {
+    --background: 210 33% 98%;
+    --foreground: 215 28% 17%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+
+    /* Blue theme (#3B82F6) */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 215 28% 17%;
+
+    --muted: 210 20% 95%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 24 94% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 92%;
+    --input: 214 20% 92%;
+    --ring: 217 91% 60%;
+
+    --radius: 2rem;
+
+    /* Back-compat tokens (previous mint theme) */
+    --mint: 217 91% 60%;
+    --mint-light: 214 95% 72%;
+    --orange: 24 94% 53%;
+    --text-primary: 215 28% 17%;
+    --text-secondary: 215 16% 47%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 160 84% 39%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Nunito', system-ui, sans-serif;
+  }
+
+  /* Force deep text contrast globally */
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(215 16% 56%);
+  }
+}
+
+@layer utilities {
+  /* Headspace-like gradients */
+  .gradient-mint,
+  .gradient-mindful {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(214 95% 72%));
+  }
+  .gradient-mint-soft {
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.08), hsl(var(--background)));
+  }
+  .gradient-header {
+    background: linear-gradient(180deg, hsl(var(--primary)), hsl(214 95% 72%));
+  }
+
+  /* Ultra-soft, close-up shadows */
+  .shadow-mint,
+  .shadow-glow-blue {
+    box-shadow:
+      0 18px 40px -22px hsl(var(--primary) / 0.55),
+      0 10px 26px -18px hsl(215 28% 17% / 0.10);
+  }
+  .shadow-mindful {
+    box-shadow:
+      0 10px 30px -22px hsl(215 28% 17% / 0.14),
+      0 2px 10px -8px hsl(215 28% 17% / 0.08);
+  }
+  .shadow-elevated {
+    box-shadow:
+      0 12px 34px -26px hsl(215 28% 17% / 0.18),
+      0 2px 10px -10px hsl(215 28% 17% / 0.10);
+  }
+  .shadow-card {
+    box-shadow:
+      0 12px 34px -28px hsl(215 28% 17% / 0.16),
+      0 2px 10px -10px hsl(215 28% 17% / 0.08);
+  }
+  .shadow-card-lg {
+    box-shadow:
+      0 18px 44px -30px hsl(215 28% 17% / 0.20),
+      0 4px 16px -12px hsl(215 28% 17% / 0.10);
+  }
+  .shadow-nav {
+    box-shadow:
+      0 -14px 44px -34px hsl(215 28% 17% / 0.18),
+      0 -2px 12px -12px hsl(215 28% 17% / 0.12);
+  }
+  .mindful-border {
+    border: 1px solid hsl(214 20% 92%);
+  }
+  .mindful-interaction {
+    transition: all 0.2s ease;
+  }
+  .mindful-interaction:active {
+    transform: scale(0.95);
+  }
+  .card-hover {
+    transition: all 0.2s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 36px -8px hsl(215 28% 17% / 0.12);
+  }
+  .card-hover:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
