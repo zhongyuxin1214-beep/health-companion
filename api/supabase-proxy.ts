@@ -1,13 +1,9 @@
 export const config = { runtime: "edge" };
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export default async function handler(req: Request): Promise<Response> {
-  // 自检：后端必须配置 SUPABASE_URL，否则直接提示前端
+  // 自检：缺少环境变量时直接返回清晰错误
   if (!SUPABASE_URL) {
     return new Response(
       JSON.stringify({
@@ -32,7 +28,7 @@ export default async function handler(req: Request): Promise<Response> {
   targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${pathSuffix}`;
   targetUrl.search = incomingUrl.search;
 
-  // CORS 预检：允许常见方法与头
+  // CORS 预检
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -47,40 +43,80 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const headers = new Headers(req.headers);
+  // 按你的要求，转发时清理可能导致拒绝的头部
   headers.delete("host");
+  headers.delete("connection");
 
-  // 确保带上 apikey（若前端未自动附带则兜底）
-  if (SUPABASE_ANON_KEY && !headers.has("apikey")) {
-    headers.set("apikey", SUPABASE_ANON_KEY);
+  const method = req.method.toUpperCase();
+  const hasBody = !["GET", "HEAD"].includes(method);
+
+  let body: BodyInit | undefined;
+  if (hasBody) {
+    // 使用 arrayBuffer 完整读取 body，避免 JSON 解析截断
+    const buffer = await req.arrayBuffer();
+    body = buffer;
   }
 
-  // Authorization 头保持原样转发（supabase-js 会自动加 Bearer token）
-  // 不做覆盖，只要存在就原封不动
+  let upstream: Response;
+  try {
+    upstream = await fetch(targetUrl.toString(), {
+      method,
+      headers,
+      body,
+      redirect: "manual",
+    });
+  } catch (error: any) {
+    return new Response(
+      JSON.stringify({
+        error: "Failed to reach Supabase",
+        message: error?.message ?? String(error),
+      }),
+      {
+        status: 502,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": incomingUrl.origin,
+        },
+      },
+    );
+  }
 
-  const shouldHaveBody = !["GET", "HEAD"].includes(req.method.toUpperCase());
+  // 非 2xx/3xx 情况下，返回清晰 JSON 错误，避免前端崩溃
+  if (!upstream.ok) {
+    let rawBody = "";
+    try {
+      rawBody = await upstream.text();
+    } catch {
+      rawBody = "";
+    }
 
-  // 使用原始 body 流构造新的 Request，实现完整流式转发
-  const upstreamRequest = new Request(targetUrl.toString(), {
-    method: req.method,
-    headers,
-    body: shouldHaveBody ? req.body : undefined,
-    redirect: "manual",
-  });
+    return new Response(
+      JSON.stringify({
+        error: "Supabase responded with an error",
+        status: upstream.status,
+        statusText: upstream.statusText,
+        body: rawBody,
+      }),
+      {
+        status: upstream.status,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": incomingUrl.origin,
+        },
+      },
+    );
+  }
 
-  const upstream = await fetch(upstreamRequest);
-
-  const responseHeaders = new Headers(upstream.headers);
-  responseHeaders.set("Access-Control-Allow-Origin", incomingUrl.origin);
-  responseHeaders.set(
-    "Access-Control-Expose-Headers",
-    "Content-Length, Date, Transfer-Encoding, Content-Encoding, apikey, Authorization",
-  );
+  // 成功时直接将响应流回前端，附带基础 CORS
+  const resHeaders = new Headers(upstream.headers);
+  resHeaders.set("Access-Control-Allow-Origin", incomingUrl.origin);
 
   return new Response(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
-    headers: responseHeaders,
+    headers: resHeaders,
   });
 }
+
 
 
