@@ -27,7 +27,7 @@ const ResetPassword = () => {
       toast.success("密码已更新，请使用新密码登录");
       navigate("/auth", { replace: true });
     } catch (err: any) {
-      toast.error(err.message || "重置密码失败");
+      toast.error(err?.message ?? String(err));
     } finally {
       setSubmitting(false);
     }
@@ -41,7 +41,7 @@ const ResetPassword = () => {
           这是一个安全页面，请为你的 MindfulFit 账户设置一个全新的密码。
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label className="block text-xs text-muted-foreground mb-1 ml-1">新密码</label>
             <input

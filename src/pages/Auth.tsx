@@ -23,20 +23,21 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    const cleanEmail = email.trim();
+    if (!cleanEmail) return;
 
     // 忘记密码模式：只发送重置邮件
     if (isResetMode) {
       setSubmitting(true);
       try {
         const redirectTo = `${window.location.origin}/reset-password`;
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo,
         });
         if (error) throw error;
         toast.success("重置邮件已发送，请检查邮箱中的链接");
       } catch (err: any) {
-        toast.error(err.message || "发送重置邮件失败");
+        toast.error(err?.message ?? String(err));
       } finally {
         setSubmitting(false);
       }
@@ -48,12 +49,12 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) throw error;
         toast.success("登录成功！");
       } else {
         const { error } = await supabase.auth.signUp({
-          email,
+          email: cleanEmail,
           password,
           options: { emailRedirectTo: window.location.origin },
         });
@@ -61,7 +62,7 @@ const Auth = () => {
         toast.success("注册成功！请查看邮箱验证链接。");
       }
     } catch (err: any) {
-      toast.error(err.message || "操作失败");
+      toast.error(err?.message ?? String(err));
     } finally {
       setSubmitting(false);
     }
@@ -106,7 +107,7 @@ const Auth = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div className="relative">
             <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
             <input
