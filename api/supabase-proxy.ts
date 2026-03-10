@@ -2,8 +2,39 @@ export const config = { runtime: "edge" };
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
+function corsHeaders(origin: string | null) {
+  // 尽量回显 origin（便于带 cookie / auth header 的场景），无 origin 则放开
+  const allowOrigin = origin ?? "*";
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, apikey, Content-Type",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  } as const;
+}
+
+function buildForwardHeaders(req: Request) {
+  const incoming = new Headers(req.headers);
+
+  // 头部清洗：移除可能导致上游拒绝或行为异常的头
+  incoming.delete("host");
+  incoming.delete("referrer");
+  incoming.delete("referer");
+  incoming.delete("connection");
+
+  // 白名单：按要求保留 Authorization / apikey / Content-Type，并补齐常用请求头
+  const forwarded = new Headers();
+  const keep = ["authorization", "apikey", "content-type", "accept", "accept-language", "x-client-info"];
+  for (const k of keep) {
+    const v = incoming.get(k);
+    if (v) forwarded.set(k, v);
+  }
+  return forwarded;
+}
+
 export default async function handler(req: Request): Promise<Response> {
-  // 自检：缺少环境变量时直接返回清晰错误
+  // 环境变量校验
   if (!SUPABASE_URL) {
     return new Response(
       JSON.stringify({
@@ -18,6 +49,12 @@ export default async function handler(req: Request): Promise<Response> {
 
   const incomingUrl = new URL(req.url);
   const prefix = "/api/supabase-proxy";
+  const origin = req.headers.get("origin");
+
+  // CORS：必须处理 OPTIONS，返回 200 并携带正确头部
+  if (req.method.toUpperCase() === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders(origin) });
+  }
 
   // 保留 /rest/v1 /auth/v1 /storage/v1 等后缀路径
   const pathSuffix = incomingUrl.pathname.startsWith(prefix)
@@ -28,34 +65,17 @@ export default async function handler(req: Request): Promise<Response> {
   targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${pathSuffix}`;
   targetUrl.search = incomingUrl.search;
 
-  // CORS 预检
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": incomingUrl.origin,
-        "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers":
-          "Authorization, apikey, X-Client-Info, Content-Type, X-Requested-With",
-        "Access-Control-Max-Age": "86400",
-      },
-    });
-  }
-
-  const headers = new Headers(req.headers);
-  // 按你的要求，转发时清理可能导致拒绝的头部
-  headers.delete("host");
-  headers.delete("connection");
-
+  // 全方法支持：GET, POST, PUT, PATCH, DELETE（以及其它方法透传）
   const method = req.method.toUpperCase();
   const hasBody = !["GET", "HEAD"].includes(method);
 
-  let body: BodyInit | undefined;
+  // 流式 Body 转发：按要求使用 request.clone().arrayBuffer() 获取完整请求体
+  let body: ArrayBuffer | undefined;
   if (hasBody) {
-    // 使用 arrayBuffer 完整读取 body，避免 JSON 解析截断
-    const buffer = await req.arrayBuffer();
-    body = buffer;
+    body = await req.clone().arrayBuffer();
   }
+
+  const headers = buildForwardHeaders(req);
 
   let upstream: Response;
   try {
@@ -75,41 +95,17 @@ export default async function handler(req: Request): Promise<Response> {
         status: 502,
         headers: {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": incomingUrl.origin,
+          ...corsHeaders(origin),
         },
       },
     );
   }
 
-  // 非 2xx/3xx 情况下，返回清晰 JSON 错误，避免前端崩溃
-  if (!upstream.ok) {
-    let rawBody = "";
-    try {
-      rawBody = await upstream.text();
-    } catch {
-      rawBody = "";
-    }
-
-    return new Response(
-      JSON.stringify({
-        error: "Supabase responded with an error",
-        status: upstream.status,
-        statusText: upstream.statusText,
-        body: rawBody,
-      }),
-      {
-        status: upstream.status,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": incomingUrl.origin,
-        },
-      },
-    );
-  }
-
-  // 成功时直接将响应流回前端，附带基础 CORS
+  // 透明代理：原样返回 Supabase 响应（无论成功或失败），并补充 CORS 头
   const resHeaders = new Headers(upstream.headers);
-  resHeaders.set("Access-Control-Allow-Origin", incomingUrl.origin);
+  for (const [k, v] of Object.entries(corsHeaders(origin))) {
+    resHeaders.set(k, v);
+  }
 
   return new Response(upstream.body, {
     status: upstream.status,
