@@ -48,8 +48,8 @@ const ResetPassword = () => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
               placeholder="至少 6 位"
+              autoComplete="new-password"
               className="w-full px-4 py-3 rounded-[24px] bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary shadow-mindful"
               required
             />
@@ -60,8 +60,8 @@ const ResetPassword = () => {
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              minLength={6}
               placeholder="再次输入新密码"
+              autoComplete="new-password"
               className="w-full px-4 py-3 rounded-[24px] bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary shadow-mindful"
               required
             />

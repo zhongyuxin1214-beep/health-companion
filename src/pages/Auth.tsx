@@ -114,6 +114,9 @@ const Auth = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="邮箱地址"
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="email"
               className="w-full pl-14 pr-5 py-4 rounded-[32px] bg-card mindful-border text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary shadow-mindful"
               required
             />
@@ -127,7 +130,7 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="密码 (至少6位)"
-                minLength={6}
+                autoComplete={isLogin ? "current-password" : "new-password"}
                 className="w-full pl-14 pr-14 py-4 rounded-[32px] bg-card mindful-border text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary shadow-mindful"
                 required
               />
