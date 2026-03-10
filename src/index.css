@@ -60,9 +60,27 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    height: 100%;
+    width: 100%;
+    overscroll-behavior: none;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Nunito', system-ui, sans-serif;
+  }
+
+  /* PWA-like “hard” scroll feel (reduce rubber-band on supporting browsers) */
+  body {
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: pan-x pan-y;
+  }
+
+  #root {
+    min-height: 100%;
   }
 
   /* Force deep text contrast globally */
