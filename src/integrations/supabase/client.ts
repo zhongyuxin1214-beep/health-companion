@@ -6,14 +6,14 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // 优先通过当前域名下的 Edge 代理，解决国内直连 Supabase 慢/不稳定的问题
 const isBrowser = typeof window !== "undefined" && typeof window.location !== "undefined";
-const SUPABASE_URL = isBrowser
+const supabaseUrl = isBrowser
   ? `${window.location.origin}/api/supabase-proxy`
   : import.meta.env.VITE_SUPABASE_URL;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(supabaseUrl, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
     persistSession: true,
