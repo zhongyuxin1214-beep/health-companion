@@ -132,7 +132,7 @@ const Index = () => {
     } catch (e: any) {
       toast.error(e?.message || "AI 暂时没听懂，请换种说法");
     } finally {
-      dismiss();
+      toast.dismiss(dismiss);
     }
   };
 
