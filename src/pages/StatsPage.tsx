@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
-import { useMealLogs } from "@/hooks/useMealLogs";
+
 import { Loader2, TrendingUp, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from "recharts";
 
