@@ -54,7 +54,7 @@ const AppHeader = ({ name, streak, onAITextSubmit }: AppHeaderProps) => {
     } catch (e: any) {
       toast.error(e?.message || "头像上传失败");
     } finally {
-      dismiss();
+      toast.dismiss(dismiss);
     }
   };
 
