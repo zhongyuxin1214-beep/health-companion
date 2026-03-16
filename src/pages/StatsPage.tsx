@@ -97,6 +97,7 @@ const StatsPage = () => {
       protein: Math.round(m.protein),
       carbs: Math.round(m.carbs),
       fat: Math.round(m.fat),
+      weight: wtMap.get(d) ?? null,
     })));
 
     setLoading(false);
