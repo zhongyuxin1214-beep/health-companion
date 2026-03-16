@@ -13,7 +13,8 @@ export default async function handler(req: Request): Promise<Response> {
 
   const incomingUrl = new URL(req.url);
   const origin = req.headers.get("origin") ?? "*";
-  const prefix = "/api/supabase-proxy/";
+  const basePath = "/api/supabase-proxy";
+  const prefix = `${basePath}/`;
 
   // 处理跨域预检：OPTIONS 直接 200
   if (req.method.toUpperCase() === "OPTIONS") {
@@ -28,20 +29,29 @@ export default async function handler(req: Request): Promise<Response> {
     });
   }
 
-  // 从请求中提取子路径：/api/supabase-proxy/<...> → /<...>
+  // 路径解析：提取 /api/supabase-proxy/ 之后的所有部分
   // 例如 /api/supabase-proxy/rest/v1/meals?x=1 → /rest/v1/meals?x=1
+  // 兼容 /api/supabase-proxy 与 /api/supabase-proxy/
   let suffixPath = "/";
-  if (incomingUrl.pathname.startsWith(prefix)) {
-    suffixPath = `/${incomingUrl.pathname.slice(prefix.length)}`;
-  } else if (incomingUrl.pathname === prefix.slice(0, -1)) {
+  if (incomingUrl.pathname === basePath || incomingUrl.pathname === prefix) {
     suffixPath = "/";
+  } else if (incomingUrl.pathname.startsWith(prefix)) {
+    const rest = incomingUrl.pathname.slice(prefix.length);
+    suffixPath = `/${rest}`;
   } else {
     // 兜底：保持原始路径（理论上不会发生）
-    suffixPath = incomingUrl.pathname;
+    suffixPath = incomingUrl.pathname.startsWith("/") ? incomingUrl.pathname : `/${incomingUrl.pathname}`;
+  }
+
+  // 防止出现双斜杠（除非它是根路径）
+  if (suffixPath !== "/") {
+    suffixPath = suffixPath.replace(/^\/+/, "/");
   }
 
   const targetUrl = new URL(SUPABASE_URL);
+  // 拼接目标：将提取出的部分准确拼接在 SUPABASE_URL 后面
   targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${suffixPath}`;
+  // 确保转发：查询参数完整转发
   targetUrl.search = incomingUrl.search;
 
   // 支持所有 HTTP 方法：GET, POST, PUT, PATCH, DELETE 等
