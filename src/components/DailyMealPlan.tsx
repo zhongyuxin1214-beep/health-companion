@@ -28,7 +28,11 @@ const feedbackOptions = [
   { label: "没时间做", emoji: "⏰" },
 ];
 
-const DailyMealPlan = () => {
+interface DailyMealPlanProps {
+  onQuickAdd?: (meal: { type: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number }) => void;
+}
+
+const DailyMealPlan = ({ onQuickAdd }: DailyMealPlanProps) => {
   const { user } = useAuth();
   const [plan, setPlan] = useState<MealItem[]>([]);
   const [advice, setAdvice] = useState("");

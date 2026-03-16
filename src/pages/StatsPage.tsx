@@ -452,13 +452,7 @@ const StatsPage = () => {
         </div>
       )}
 
-      <BottomNav onAdd={() => setShowAddMeal(true)} />
-      {showAddMeal && (
-        <AddMealDialog
-          onClose={() => setShowAddMeal(false)}
-          onAdd={(meal) => { addMeal(meal); setShowAddMeal(false); }}
-        />
-      )}
+      <BottomNav />
     </div>
   );
 };
