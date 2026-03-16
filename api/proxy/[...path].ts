@@ -3,7 +3,6 @@ export const config = { runtime: "edge" };
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
 export default async function handler(req: Request): Promise<Response> {
-  // 环境变量：必须配置 SUPABASE_URL
   if (!SUPABASE_URL) {
     return new Response(
       JSON.stringify({ error: "SUPABASE_URL is not configured on the server" }),
@@ -13,10 +12,10 @@ export default async function handler(req: Request): Promise<Response> {
 
   const incomingUrl = new URL(req.url);
   const origin = req.headers.get("origin") ?? "*";
-  const basePath = "/api/supabase-proxy";
+  const basePath = "/api/proxy";
   const prefix = `${basePath}/`;
 
-  // 处理跨域预检：OPTIONS 直接 200
+  // CORS preflight
   if (req.method.toUpperCase() === "OPTIONS") {
     return new Response(null, {
       status: 200,
@@ -29,42 +28,29 @@ export default async function handler(req: Request): Promise<Response> {
     });
   }
 
-  // 路径解析：提取 /api/supabase-proxy/ 之后的所有部分
-  // 例如 /api/supabase-proxy/rest/v1/meals?x=1 → /rest/v1/meals?x=1
-  // 兼容 /api/supabase-proxy 与 /api/supabase-proxy/
+  // Extract everything after /api/proxy/
   let suffixPath = "/";
   if (incomingUrl.pathname === basePath || incomingUrl.pathname === prefix) {
     suffixPath = "/";
   } else if (incomingUrl.pathname.startsWith(prefix)) {
-    const rest = incomingUrl.pathname.slice(prefix.length);
-    suffixPath = `/${rest}`;
+    suffixPath = `/${incomingUrl.pathname.slice(prefix.length)}`.replace(/^\/+/, "/");
   } else {
-    // 兜底：保持原始路径（理论上不会发生）
     suffixPath = incomingUrl.pathname.startsWith("/") ? incomingUrl.pathname : `/${incomingUrl.pathname}`;
   }
 
-  // 防止出现双斜杠（除非它是根路径）
-  if (suffixPath !== "/") {
-    suffixPath = suffixPath.replace(/^\/+/, "/");
-  }
-
   const targetUrl = new URL(SUPABASE_URL);
-  // 拼接目标：将提取出的部分准确拼接在 SUPABASE_URL 后面
   targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${suffixPath}`;
-  // 确保转发：查询参数完整转发
   targetUrl.search = incomingUrl.search;
 
-  // 支持所有 HTTP 方法：GET, POST, PUT, PATCH, DELETE 等
   const method = req.method.toUpperCase();
   const hasBody = !["GET", "HEAD"].includes(method);
 
-  // 完整转发 Body：使用 arrayBuffer 读取原始请求体
   let body: ArrayBuffer | undefined;
   if (hasBody) {
     body = await req.arrayBuffer();
   }
 
-  // 头部清洗：只保留 Authorization / apikey / Content-Type，移除 host / referrer
+  // Keep only the required auth headers; strip host/referrer-like headers
   const incomingHeaders = new Headers(req.headers);
   incomingHeaders.delete("host");
   incomingHeaders.delete("referrer");
