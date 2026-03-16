@@ -289,8 +289,12 @@ const StatsPage = () => {
       {/* Macro Trends Chart */}
       {macroData.length > 0 && (
         <div className="mx-4 mt-4 bg-card rounded-2xl p-4 shadow-card-lg border border-border">
-          <h3 className="font-bold text-sm text-foreground mb-3">宏量营养素趋势</h3>
-          <div className="flex gap-4 mb-3 text-xs text-muted-foreground">
+          <h3 className="font-bold text-sm text-[#1E293B] mb-3">宏量营养素趋势</h3>
+          <div className="flex flex-wrap gap-3 mb-3 text-xs text-[#1E293B]/70">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-muted" />
+              <span>体重(kg)</span>
+            </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-1 rounded-full bg-primary" />
               <span>蛋白质</span>
@@ -305,28 +309,31 @@ const StatsPage = () => {
             </div>
           </div>
 
-          <div className="h-48">
+          <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={macroData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
-                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#1E293B" }} stroke="hsl(var(--border))" />
+                <YAxis yAxisId="macro" tick={{ fontSize: 10, fill: "#1E293B" }} stroke="hsl(var(--border))" />
+                <YAxis yAxisId="wt" orientation="right" domain={["dataMin - 1", "dataMax + 1"]} tick={{ fontSize: 10, fill: "#1E293B" }} stroke="hsl(var(--border))" />
                 <Tooltip
                   contentStyle={{
                     background: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "16px",
                     fontSize: "12px",
-                    color: "hsl(var(--foreground))",
+                    color: "#1E293B",
                   }}
                   formatter={(value: number, name: string) => {
-                    const labels: Record<string, string> = { protein: "蛋白质", carbs: "碳水", fat: "脂肪" };
-                    return [`${value}g`, labels[name] || name];
+                    const labels: Record<string, string> = { protein: "蛋白质", carbs: "碳水", fat: "脂肪", weight: "体重" };
+                    const unit = name === "weight" ? "kg" : "g";
+                    return [`${value}${unit}`, labels[name] || name];
                   }}
                 />
-                <Line type="monotone" dataKey="protein" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                <Line type="monotone" dataKey="carbs" stroke="hsl(var(--secondary))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                <Line type="monotone" dataKey="fat" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                <Bar yAxisId="wt" dataKey="weight" fill="hsl(var(--muted))" radius={[6, 6, 0, 0]} opacity={0.5} />
+                <Line yAxisId="macro" type="monotone" dataKey="protein" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                <Line yAxisId="macro" type="monotone" dataKey="carbs" stroke="hsl(var(--secondary))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                <Line yAxisId="macro" type="monotone" dataKey="fat" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
