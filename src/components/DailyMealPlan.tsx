@@ -157,8 +157,26 @@ const DailyMealPlan = ({ onQuickAdd }: DailyMealPlanProps) => {
                     <p className="text-sm font-semibold text-foreground">{item.food}</p>
                   </div>
                   <span className="text-sm font-extrabold text-primary tabular-nums">
-                    {item.calories}<span className="text-xs font-medium text-muted-foreground ml-0.5">kcal</span>
+                    {item.calories}<span className="text-xs font-medium text-[#1E293B]/60 ml-0.5">kcal</span>
                   </span>
+                  {onQuickAdd && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onQuickAdd({
+                          type: item.meal,
+                          name: item.food,
+                          calories: item.calories,
+                          protein: item.macros?.protein,
+                          carbs: item.macros?.carbs,
+                          fat: item.macros?.fat,
+                        });
+                      }}
+                      className="text-[10px] font-bold text-primary-foreground bg-primary px-2.5 py-1.5 rounded-xl hover:bg-primary/90 active:scale-95 transition-all flex-shrink-0"
+                    >
+                      一键记录
+                    </button>
+                  )}
                   {item.macros ? (
                     expandedMeal === i ? <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   ) : null}
