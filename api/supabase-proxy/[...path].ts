@@ -13,7 +13,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   const incomingUrl = new URL(req.url);
   const origin = req.headers.get("origin") ?? "*";
-  const prefix = "/api/supabase-proxy";
+  const prefix = "/api/supabase-proxy/";
 
   // 处理跨域预检：OPTIONS 直接 200
   if (req.method.toUpperCase() === "OPTIONS") {
@@ -28,13 +28,20 @@ export default async function handler(req: Request): Promise<Response> {
     });
   }
 
-  // 构造转发目标 URL，保留 /rest/v1 /auth/v1 /storage/v1 等后缀路径
-  const pathSuffix = incomingUrl.pathname.startsWith(prefix)
-    ? incomingUrl.pathname.slice(prefix.length)
-    : incomingUrl.pathname;
+  // 从请求中提取子路径：/api/supabase-proxy/<...> → /<...>
+  // 例如 /api/supabase-proxy/rest/v1/meals?x=1 → /rest/v1/meals?x=1
+  let suffixPath = "/";
+  if (incomingUrl.pathname.startsWith(prefix)) {
+    suffixPath = `/${incomingUrl.pathname.slice(prefix.length)}`;
+  } else if (incomingUrl.pathname === prefix.slice(0, -1)) {
+    suffixPath = "/";
+  } else {
+    // 兜底：保持原始路径（理论上不会发生）
+    suffixPath = incomingUrl.pathname;
+  }
 
   const targetUrl = new URL(SUPABASE_URL);
-  targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${pathSuffix}`;
+  targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${suffixPath}`;
   targetUrl.search = incomingUrl.search;
 
   // 支持所有 HTTP 方法：GET, POST, PUT, PATCH, DELETE 等
@@ -78,6 +85,4 @@ export default async function handler(req: Request): Promise<Response> {
     headers: resHeaders,
   });
 }
-
-
 
