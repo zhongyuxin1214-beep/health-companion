@@ -8,7 +8,6 @@ export default async function handler(req: any, res: any) {
 
     if (!apiKey || !endpointId) return res.status(200).json({ error: "服务器 Key 未配置" });
 
-    // 【核心修复】确保 Base64 格式正确：去掉 data:image/xxx;base64, 前缀
     if (image.includes('base64,')) {
       image = image.split('base64,')[1];
     }
@@ -27,7 +26,16 @@ export default async function handler(req: any, res: any) {
             content: [
               {
                 type: "text",
-                text: "Food identification. Return ONLY JSON: {\"name\": \"食物\", \"calories\": 0, \"protein\": 0, \"carbs\": 0, \"fat\": 0}"
+                text: `你是一位专业营养师。请仔细识别图片中的食物，返回以下5项数据。
+要求：
+1. name: 具体食物名称（如"红烧排骨配米饭"而不是"一盘菜"）
+2. calories: 估算总热量(kcal)，考虑份量大小
+3. protein: 蛋白质克数(g)，精确到整数
+4. carbs: 碳水化合物克数(g)，精确到整数
+5. fat: 脂肪克数(g)，精确到整数
+
+只返回JSON格式: {"name": "食物名", "calories": 数字, "protein": 数字, "carbs": 数字, "fat": 数字}
+不要返回任何其他文字。`
               },
               {
                 type: "image_url",
@@ -38,8 +46,8 @@ export default async function handler(req: any, res: any) {
             ]
           }
         ],
-        temperature: 0.1, // 降低随机性提高速度
-        max_tokens: 500   // 限制输出长度提高速度
+        temperature: 0.1,
+        max_tokens: 500
       })
     });
 
@@ -53,7 +61,6 @@ export default async function handler(req: any, res: any) {
     }
 
     const aiText = data.choices?.[0]?.message?.content || "";
-    // 后端提取 JSON
     const jsonMatch = aiText.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       return res.status(200).json(JSON.parse(jsonMatch[0]));
