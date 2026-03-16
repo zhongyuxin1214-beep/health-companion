@@ -104,16 +104,21 @@ const AddMealDialog = ({ onClose, onAdd, editMeal, prefillMeal }: AddMealDialogP
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = () => {
-    if (!name || !calories) { toast.error("请填写名称和热量"); return; }
-    onAdd({
+const handleSubmit = () => {
+    if (!name || !calories) return;
+    
+    // 数据清洗：确保数值字段不是空字符串，如果是空的则设为 0
+    const cleanMeal = {
       type,
       name,
-      calories: parseInt(calories),
-      protein: parseFloat(protein) || undefined,
-      carbs: parseFloat(carbs) || undefined,
-      fat: parseFloat(fat) || undefined,
-    });
+      calories: parseInt(calories) || 0,
+      protein: protein ? parseFloat(protein) : 0,
+      carbs: carbs ? parseFloat(carbs) : 0,
+      fat: fat ? parseFloat(fat) : 0,
+      date: new Date().toISOString().split('T')[0] // 确保日期格式正确
+    };
+
+    onAdd(cleanMeal);
     onClose();
   };
 
