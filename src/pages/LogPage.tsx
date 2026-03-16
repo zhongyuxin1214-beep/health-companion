@@ -7,7 +7,7 @@ import AddMealDialog from "@/components/AddMealDialog";
 import DailyMealPlan from "@/components/DailyMealPlan";
 import OilSlider from "@/components/OilSlider";
 import type { Meal } from "@/components/MealLog";
-import { Loader2, Pencil, ChefHat, Trash2, Flame, Camera, Mic, MicOff } from "lucide-react";
+import { Loader2, Pencil, ChefHat, Trash2, Flame, Camera, Mic, MicOff, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -25,24 +25,19 @@ const LogPage = () => {
   const [recognizing, setRecognizing] = useState(false);
   const [listening, setListening] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
   }, [authLoading, user, navigate]);
 
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-secondary" />
-      </div>
-    );
+    return <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-[#10B981]" /></div>;
   }
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("meal_logs").delete().eq("id", id);
     if (error) { toast.error("删除失败"); return; }
-    toast.success("已删除");
+    toast.success("已删除记录");
     refetch();
   };
 
@@ -51,22 +46,13 @@ const LogPage = () => {
     if (meal) { setEditingMeal(meal); setShowAddMeal(true); }
   };
 
-  const handleAddMeal = (meal: { type: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number }) => {
-    if (editingMeal) {
-      updateMeal(editingMeal.id, meal);
-      setEditingMeal(null);
-    } else {
-      addMeal(meal);
-    }
-  };
-
-  // Photo recognition - directly add to meal_logs
+  // 图片压缩与识别 (保持之前的提速逻辑)
   const handlePhotoRecognize = async (file: File) => {
     setRecognizing(true);
-    const loadingId = toast.loading("AI 正在识别食物...");
+    const loadingId = toast.loading("AI 正在精细化识别...");
     try {
       const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
+      const base64 = await new Promise<string>((resolve) => {
         reader.onload = (e) => {
           const img = new Image();
           img.onload = () => {
@@ -79,10 +65,8 @@ const LogPage = () => {
             canvas.getContext("2d")?.drawImage(img, 0, 0, w, h);
             resolve(canvas.toDataURL("image/jpeg", 0.4).split(",")[1]);
           };
-          img.onerror = reject;
           img.src = e.target?.result as string;
         };
-        reader.onerror = reject;
         reader.readAsDataURL(file);
       });
 
@@ -94,16 +78,16 @@ const LogPage = () => {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      // Auto-add to meal_logs
       await addMeal({
         type: "加餐",
-        name: data.name || "未知食物",
-        calories: Number(data.calories) || 0,
-        protein: data.protein != null ? Number(data.protein) : undefined,
-        carbs: data.carbs != null ? Number(data.carbs) : undefined,
-        fat: data.fat != null ? Number(data.fat) : undefined,
+        name: data.name,
+        calories: Number(data.calories),
+        protein: Number(data.protein) || 0,
+        carbs: Number(data.carbs) || 0,
+        fat: Number(data.fat) || 0,
       });
-      toast.success(`已识别并记录：${data.name}`);
+      toast.success(`已记录：${data.name}`);
+      refetch();
     } catch (err: any) {
       toast.error(err.message || "识别失败");
     } finally {
@@ -112,204 +96,92 @@ const LogPage = () => {
     }
   };
 
-  // Voice recognition
-  const handleVoiceToggle = () => {
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      return;
-    }
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast.error("浏览器不支持语音识别");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "zh-CN";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognitionRef.current = recognition;
-
-    recognition.onresult = async (event: any) => {
-      const text = event.results[0][0].transcript;
-      setListening(false);
-      const loadingId = toast.loading(`AI 正在解析："${text}"`);
-      try {
-        const res = await fetch("/api/voice-log", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-        const data = await res.json();
-        if (!data?.name || !data?.calories) throw new Error(data?.error || "解析失败");
-
-        await addMeal({
-          type: "加餐",
-          name: data.name,
-          calories: Number(data.calories),
-          protein: data.protein != null ? Number(data.protein) : undefined,
-          carbs: data.carbs != null ? Number(data.carbs) : undefined,
-          fat: data.fat != null ? Number(data.fat) : undefined,
-        });
-        toast.success(`已识别并记录：${data.name}`);
-      } catch (e: any) {
-        toast.error(e?.message || "AI 解析失败");
-      } finally {
-        toast.dismiss(loadingId);
-      }
-    };
-
-    recognition.onerror = () => { setListening(false); toast.error("语音识别出错"); };
-    recognition.onend = () => setListening(false);
-    recognition.start();
-    setListening(true);
-    toast.info("请说出你吃了什么...");
-  };
-
-  const mealOrder = ["早餐", "午餐", "晚餐", "加餐"];
-  const grouped = mealOrder.map((type) => ({
+  const grouped = ["早餐", "午餐", "晚餐", "加餐"].map((type) => ({
     type,
     meals: meals.filter((m) => m.type === type),
   })).filter((g) => g.meals.length > 0);
 
   return (
-    <div className="min-h-screen bg-background max-w-md mx-auto relative pb-32">
-      {/* Header */}
-      <div className="px-4 pt-12 pb-4">
-        <p className="text-sm text-[#1E293B] font-bold">饮食日志</p>
-        <div className="flex items-end gap-2 mt-1">
-          <span className="text-5xl font-extrabold text-foreground tabular-nums">{totalConsumed}</span>
-          <span className="text-lg text-[#1E293B] font-medium mb-1.5">kcal</span>
-          <Flame className="w-6 h-6 text-accent mb-2 ml-1" />
-        </div>
+    <div className="min-h-screen bg-[#F8FAFC] max-w-md mx-auto relative pb-40 overflow-y-auto">
+      {/* 顶部热量汇总 */}
+      <div className="px-6 pt-12 pb-6">
+        <h2 className="text-[28px] font-black text-[#1E293B] leading-none">{totalConsumed} <span className="text-sm font-bold text-slate-400">kcal</span></h2>
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">今日总摄入日志</p>
       </div>
 
-      {/* AI Recommended Meals */}
-      <DailyMealPlan onQuickAdd={addMeal} />
-
-      {/* Big Photo/Voice recognition area */}
-      <div className="mx-4 mt-4">
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
-          onChange={(e) => e.target.files?.[0] && handlePhotoRecognize(e.target.files[0])} />
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={recognizing}
-            className="flex flex-col items-center justify-center gap-3 py-8 rounded-[28px] bg-primary/10 border-2 border-primary/20 active:scale-95 transition-all disabled:opacity-50"
-          >
-            {recognizing ? (
-              <Loader2 className="w-10 h-10 text-primary animate-spin" />
-            ) : (
-              <Camera className="w-10 h-10 text-primary" strokeWidth={1.5} />
-            )}
-            <span className="text-sm font-extrabold text-[#1E293B]">📷 拍照识别</span>
-            <span className="text-[10px] text-[#1E293B]/70 font-medium">拍一张，AI 自动记录</span>
-          </button>
-          <button
-            onClick={handleVoiceToggle}
-            className={`flex flex-col items-center justify-center gap-3 py-8 rounded-[28px] border-2 active:scale-95 transition-all ${
-              listening ? "bg-accent/20 border-accent/40" : "bg-accent/10 border-accent/20"
-            }`}
-          >
-            {listening ? (
-              <MicOff className="w-10 h-10 text-accent animate-pulse" strokeWidth={1.5} />
-            ) : (
-              <Mic className="w-10 h-10 text-accent" strokeWidth={1.5} />
-            )}
-            <span className="text-sm font-extrabold text-[#1E293B]">🎙️ 语音识别</span>
-            <span className="text-[10px] text-[#1E293B]/70 font-medium">{listening ? "正在听..." : "说出你吃了什么"}</span>
-          </button>
-        </div>
+      {/* 行为闭环 1：AI 推荐置顶 */}
+      <div className="mx-6 mb-8">
+        <h3 className="text-sm font-black text-[#1E293B] mb-4 flex items-center gap-2">
+          <ChefHat className="w-4 h-4 text-[#10B981]" /> AI 今日推荐菜谱
+        </h3>
+        <DailyMealPlan onQuickAdd={(m) => { addMeal(m); toast.success("已按推荐记录"); }} />
       </div>
 
-      {/* Today's meal list */}
-      <div className="mx-4 mt-5 space-y-4">
-        <h3 className="text-sm font-extrabold text-[#1E293B]">今日摄入明细</h3>
+      {/* 核心录入入口：图2风格 */}
+      <div className="px-6 mb-8">
+        <div className="grid grid-cols-2 gap-4">
+          <button onClick={() => fileRef.current?.click()} className="h-32 rounded-[32px] bg-white shadow-xl shadow-emerald-500/5 flex flex-col items-center justify-center gap-2 border border-slate-50 active:scale-95 transition-transform">
+             <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                <Camera className="w-6 h-6 text-[#10B981]" />
+             </div>
+             <span className="text-sm font-bold text-[#1E293B]">拍照识别</span>
+          </button>
+          <button onClick={() => setShowAddMeal(true)} className="h-32 rounded-[32px] bg-white shadow-xl shadow-blue-500/5 flex flex-col items-center justify-center gap-2 border border-slate-50 active:scale-95 transition-transform">
+             <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center">
+                <Mic className="w-6 h-6 text-[#3B82F6]" />
+             </div>
+             <span className="text-sm font-bold text-[#1E293B]">语音补录</span>
+          </button>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handlePhotoRecognize(e.target.files[0])} />
+      </div>
+
+      {/* 饮食清单 */}
+      <div className="px-6 space-y-6">
+        <h3 className="text-sm font-black text-[#1E293B]">今日摄入明细</h3>
         {grouped.length === 0 ? (
-          <div className="bg-card rounded-[28px] p-10 text-center shadow-card border border-border">
-            <div className="text-4xl mb-3">🍽️</div>
-            <p className="font-bold text-foreground mb-1">还没有记录</p>
-            <p className="text-sm text-[#1E293B]/70">用上方拍照或语音开始记录</p>
+          <div className="bg-white rounded-[32px] p-12 text-center shadow-sm border border-slate-100">
+            <p className="text-slate-400 font-bold">还没有任何记录哦</p>
           </div>
         ) : (
           grouped.map((group) => (
-            <div key={group.type}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">{mealTypeEmoji[group.type] || "🍽️"}</span>
-                <span className="text-sm font-bold text-[#1E293B]">{group.type}</span>
-                <span className="text-xs text-[#1E293B]/70 font-semibold">
-                  {group.meals.reduce((s, m) => s + Math.round(m.calories * (m.oilMultiplier || 1)), 0)} kcal
-                </span>
+            <div key={group.type} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{mealTypeEmoji[group.type]}</span>
+                <span className="text-xs font-black text-[#1E293B] uppercase tracking-wider">{group.type}</span>
               </div>
-              <div className="space-y-2 pl-2 border-l-2 border-border ml-2.5">
-                {group.meals.map((meal) => (
-                  <div key={meal.id} className="bg-card rounded-[24px] px-4 py-3.5 shadow-card ml-4 border border-border">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-[#1E293B]">{meal.name}</p>
-                        {meal.oilMultiplier && meal.oilMultiplier > 1 && (
-                          <span className="text-[10px] gradient-accent text-accent-foreground px-1.5 py-0.5 rounded-full font-bold">
-                            油度 {meal.oilMultiplier}x
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-extrabold text-sm tabular-nums text-primary">
-                        {Math.round(meal.calories * (meal.oilMultiplier || 1))}
-                        <span className="text-xs font-medium text-[#1E293B]/60 ml-0.5">kcal</span>
-                      </span>
-                      <div className="flex gap-1">
-                        <button onClick={() => handleEdit(meal.id)} className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-border transition-colors">
-                          <Pencil className="w-3 h-3 text-[#1E293B]/60" />
-                        </button>
-                        <button onClick={() => setShowOilSlider(meal.id)} className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-border transition-colors">
-                          <ChefHat className="w-3 h-3 text-[#1E293B]/60" />
-                        </button>
-                        <button onClick={() => handleDelete(meal.id)} className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-destructive/20 transition-colors">
-                          <Trash2 className="w-3 h-3 text-[#1E293B]/60" />
-                        </button>
+              {group.meals.map((meal) => (
+                <div key={meal.id} className="bg-white rounded-[24px] p-4 shadow-sm border border-slate-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-sm text-[#1E293B]">{meal.name}</p>
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-[10px] font-bold text-emerald-500">P {meal.protein}g</span>
+                        <span className="text-[10px] font-bold text-blue-500">C {meal.carbs}g</span>
+                        <span className="text-[10px] font-bold text-orange-500">F {meal.fat}g</span>
                       </div>
                     </div>
-                    {/* P/C/F display */}
-                    {(meal.protein || meal.carbs || meal.fat) && (
-                      <div className="flex gap-3 mt-2">
-                        {meal.protein != null && <span className="text-[11px] text-primary font-bold">P {meal.protein}g</span>}
-                        {meal.carbs != null && <span className="text-[11px] text-secondary font-bold">C {meal.carbs}g</span>}
-                        {meal.fat != null && <span className="text-[11px] text-accent font-bold">F {meal.fat}g</span>}
+                    <div className="text-right">
+                      <p className="font-black text-sm text-[#10B981]">{meal.calories} kcal</p>
+                      <div className="flex gap-2 mt-1 justify-end">
+                        <button onClick={() => handleEdit(meal.id)}><Pencil className="w-3.5 h-3.5 text-slate-300" /></button>
+                        <button onClick={() => handleDelete(meal.id)}><Trash2 className="w-3.5 h-3.5 text-red-200" /></button>
                       </div>
-                    )}
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           ))
         )}
       </div>
 
-      {/* Manual add button */}
-      <div className="mx-4 mt-4">
-        <button
-          onClick={() => { setEditingMeal(null); setShowAddMeal(true); }}
-          className="w-full py-3.5 rounded-[24px] border-2 border-dashed border-primary/30 text-sm font-bold text-primary hover:bg-primary/5 transition-colors active:scale-95"
-        >
-          + 手动添加饮食记录
-        </button>
-      </div>
+      <BottomNav onAdd={() => setShowAddMeal(true)} />
 
-      <BottomNav />
-
-      {showOilSlider && (
-        <OilSlider
-          mealId={showOilSlider}
-          onAdjust={(id, mult) => { adjustOil(id, mult); setShowOilSlider(null); }}
-          onClose={() => setShowOilSlider(null)}
-        />
-      )}
       {showAddMeal && (
-        <AddMealDialog
-          onClose={() => { setShowAddMeal(false); setEditingMeal(null); }}
-          onAdd={(meal) => { handleAddMeal(meal); setShowAddMeal(false); }}
+        <AddMealDialog 
+          onClose={() => {setShowAddMeal(false); setEditingMeal(null);}} 
+          onAdd={(m) => { handleAddMeal(m); setShowAddMeal(false); refetch(); }} 
           editMeal={editingMeal}
         />
       )}
