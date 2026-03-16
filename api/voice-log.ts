@@ -14,7 +14,16 @@ export default async function handler(req: Request) {
     body: JSON.stringify({
       model: endpointId,
       messages: [
-        { role: "system", content: '你是一个饮食专家。从用户话语中提取食物名和营养数据，只返回JSON: {"name": "食物名", "calories": 数字, "protein": 蛋白质克数, "carbs": 碳水克数, "fat": 脂肪克数}' },
+        { role: "system", content: `你是一位专业营养师。从用户描述中提取食物信息，必须返回完整的5项营养数据。
+规则：
+1. name: 具体食物名（如用户说"吃了碗面"应返回"一碗面条"）
+2. calories: 估算总热量(kcal)
+3. protein: 蛋白质克数(g)，精确到整数
+4. carbs: 碳水化合物克数(g)，精确到整数  
+5. fat: 脂肪克数(g)，精确到整数
+
+如果用户提到多种食物，合并为一条记录，名称用"+"连接。
+只返回JSON: {"name": "食物名", "calories": 数字, "protein": 数字, "carbs": 数字, "fat": 数字}` },
         { role: "user", content: text }
       ]
     })

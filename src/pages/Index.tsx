@@ -4,20 +4,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useMealLogs } from "@/hooks/useMealLogs";
 import { useDailyWeight } from "@/hooks/useDailyWeight";
-import AppHeader from "@/components/AppHeader";
 import CalorieDashboard from "@/components/CalorieDashboard";
-import DailyMealPlan from "@/components/DailyMealPlan";
 import BottomNav from "@/components/BottomNav";
 import WeightInput from "@/components/WeightInput";
-import AddMealDialog from "@/components/AddMealDialog";
 import ProfileWizard from "@/components/ProfileWizard";
-import WorkoutPlanCard from "@/components/WorkoutPlanCard";
 import MorningCheckIn from "@/components/MorningCheckIn";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Ruler, Scale, Activity, Target } from "lucide-react";
-import { toast } from "sonner";
 
-// Session-level cache to prevent re-querying on tab switches
 let energyCache: { date: string; level: string | null; checked: boolean } = {
   date: "",
   level: null,
@@ -28,18 +22,9 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { profile, hasProfile, tdee, loading: profileLoading, refetch: refetchProfile } = useProfile();
-  const { totalConsumed, addMeal } = useMealLogs();
+  const { meals, totalConsumed } = useMealLogs();
   const { todayWeight, loading: weightLoading, editing, setEditing, saveWeight } = useDailyWeight();
 
-  const [showAddMeal, setShowAddMeal] = useState(false);
-  const [prefillMeal, setPrefillMeal] = useState<{
-    type?: string;
-    name: string;
-    calories: number;
-    protein?: number;
-    carbs?: number;
-    fat?: number;
-  } | null>(null);
   const [showWizard, setShowWizard] = useState(false);
   const [showMorningCheck, setShowMorningCheck] = useState(false);
   const [energyLevel, setEnergyLevel] = useState<string | null>(null);
@@ -49,19 +34,15 @@ const Index = () => {
     if (!authLoading && !user) navigate("/auth");
   }, [authLoading, user, navigate]);
 
-  // Check if morning check-in is needed — with session cache
   useEffect(() => {
     if (!user) return;
     const todayStr = new Date().toISOString().slice(0, 10);
-
-    // If we already checked today in this session, use cached result
     if (energyCache.checked && energyCache.date === todayStr) {
       setEnergyLevel(energyCache.level);
       setShowMorningCheck(!energyCache.level);
       setCheckingEnergy(false);
       return;
     }
-
     supabase
       .from("daily_recommendations")
       .select("energy_level")
@@ -103,118 +84,79 @@ const Index = () => {
     sedentary: "久坐", light: "轻度", moderate: "中度", active: "高强度",
   };
 
-  const handleAITextSubmit = async (text: string) => {
-    const cleaned = text.trim();
-    if (!cleaned) return;
+  // Compute macros from today's meals
+  const totalProtein = meals.reduce((s, m) => s + (m.protein || 0), 0);
+  const totalCarbs = meals.reduce((s, m) => s + (m.carbs || 0), 0);
+  const totalFat = meals.reduce((s, m) => s + (m.fat || 0), 0);
 
-    const dismiss = toast.loading("AI 正在解析...");
-    try {
-      const res = await fetch("/api/voice-log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: cleaned }),
-      });
-      const data = await res.json();
-      if (!data?.name || !data?.calories) {
-        throw new Error(data?.error || "解析失败");
-      }
-
-      setPrefillMeal({
-        type: "加餐",
-        name: data.name,
-        calories: Number(data.calories),
-        protein: data.protein != null ? Number(data.protein) : undefined,
-        carbs: data.carbs != null ? Number(data.carbs) : undefined,
-        fat: data.fat != null ? Number(data.fat) : undefined,
-      });
-      setShowAddMeal(true);
-      toast.success("已识别，确认后即可记录");
-    } catch (e: any) {
-      toast.error(e?.message || "AI 暂时没听懂，请换种说法");
-    } finally {
-      toast.dismiss(dismiss);
-    }
-  };
+  const today = new Date();
+  const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  const dateStr = `${today.getMonth() + 1}月${today.getDate()}日 ${weekdays[today.getDay()]}`;
 
   return (
     <div className="min-h-screen bg-background max-w-md mx-auto relative pb-32">
-      <AppHeader name={userName} streak={0} onAITextSubmit={handleAITextSubmit} />
-
-      {/* 按类型浏览 */}
-      <div className="mt-6 mb-4 px-6 overflow-hidden">
-        <h3 className="text-sm font-black text-foreground mb-4">按类型浏览</h3>
-        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4">
-          {[
-            { n: "素食", e: "🥗" },
-            { n: "蛋白质", e: "🍗" },
-            { n: "低碳", e: "🥑" },
-            { n: "零食", e: "🍿" },
-            { n: "饮品", e: "🍹" },
-          ].map((item) => (
-            <div key={item.n} className="flex flex-col items-center gap-2 min-w-[70px]">
-              <div className="w-16 h-16 bg-card rounded-[32px] shadow-card flex items-center justify-center text-3xl border border-border card-hover">
-                {item.e}
-              </div>
-              <span className="text-[10px] font-bold text-muted-foreground">{item.n}</span>
-            </div>
-          ))}
-        </div>
+      {/* Simple header */}
+      <div className="bg-gradient-to-br from-[#3B82F6] to-[#60A5FA] px-6 pt-10 pb-14 relative overflow-hidden">
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+        <p className="text-white/80 text-[10px] font-bold tracking-widest uppercase relative z-10">{dateStr}</p>
+        <h1 className="text-2xl font-black text-white leading-tight relative z-10 mt-1">Hi, {userName}</h1>
+        <p className="text-white/70 text-xs font-semibold mt-1 relative z-10">
+          {energyLevel === "energetic" ? "活力满满🔥 适合挑战高强度" : energyLevel === "tired" ? "今天注意休息😴" : "保持节奏，继续加油💪"}
+        </p>
       </div>
 
+      {/* Body profile card */}
       {profile && (
-        <div className="mx-6 -mt-10 bg-card rounded-[28px] shadow-card-lg p-5 relative z-10 mb-5 border border-border card-hover">
-          <p className="text-xs text-muted-foreground font-bold tracking-widest uppercase mb-3 text-center">身体档案</p>
+        <div className="mx-6 -mt-8 bg-card rounded-[28px] shadow-card-lg p-5 relative z-10 mb-5 border border-border">
+          <p className="text-xs text-[#1E293B] font-bold tracking-widest uppercase mb-3 text-center">身体档案</p>
           <div className="grid grid-cols-4 gap-3">
             <div className="flex flex-col items-center gap-1.5">
               <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
                 <Ruler className="w-5 h-5 text-primary" strokeWidth={1.5} />
               </div>
               <span className="text-base font-extrabold text-foreground">{profile.height || "--"}</span>
-              <span className="text-[10px] text-muted-foreground font-medium">cm</span>
+              <span className="text-[10px] text-[#1E293B] font-medium">cm</span>
             </div>
             <div className="flex flex-col items-center gap-1.5">
               <div className="w-11 h-11 rounded-2xl bg-accent/10 flex items-center justify-center">
                 <Scale className="w-5 h-5 text-accent" strokeWidth={1.5} />
               </div>
               <span className="text-base font-extrabold text-foreground">{profile.weight || "--"}</span>
-              <span className="text-[10px] text-muted-foreground font-medium">kg</span>
+              <span className="text-[10px] text-[#1E293B] font-medium">kg</span>
             </div>
             <div className="flex flex-col items-center gap-1.5">
               <div className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center">
                 <Activity className="w-5 h-5 text-blue-500" strokeWidth={1.5} />
               </div>
               <span className="text-base font-extrabold text-foreground">{bmi}</span>
-              <span className="text-[10px] text-muted-foreground font-medium">BMI</span>
+              <span className="text-[10px] text-[#1E293B] font-medium">BMI</span>
             </div>
             <div className="flex flex-col items-center gap-1.5">
               <div className="w-11 h-11 rounded-2xl bg-muted flex items-center justify-center">
                 <Target className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
               </div>
               <span className="text-base font-extrabold text-foreground">{activityLabels[profile.activity_level || ""] || "--"}</span>
-              <span className="text-[10px] text-muted-foreground font-medium">活动</span>
+              <span className="text-[10px] text-[#1E293B] font-medium">活动</span>
             </div>
           </div>
         </div>
       )}
 
-      <div className={profile ? "" : "-mt-14"}>
-        <CalorieDashboard consumed={totalConsumed} target={tdee} onTargetChange={() => {}} />
+      {/* Calorie dashboard */}
+      <div className={profile ? "" : "-mt-8"}>
+        <CalorieDashboard
+          consumed={totalConsumed}
+          target={tdee}
+          onTargetChange={() => {}}
+          macros={{ protein: Math.round(totalProtein), carbs: Math.round(totalCarbs), fat: Math.round(totalFat) }}
+        />
       </div>
 
+      {/* Weight input */}
       <WeightInput todayWeight={todayWeight} editing={editing} loading={weightLoading} onEdit={() => setEditing(true)} onSave={saveWeight} />
 
-      <WorkoutPlanCard />
-      <DailyMealPlan />
+      <BottomNav />
 
-      <BottomNav onAdd={() => setShowAddMeal(true)} />
-
-      {showAddMeal && (
-        <AddMealDialog
-          prefillMeal={prefillMeal ?? undefined}
-          onClose={() => { setShowAddMeal(false); setPrefillMeal(null); }}
-          onAdd={(meal) => { addMeal(meal); setShowAddMeal(false); setPrefillMeal(null); }}
-        />
-      )}
       {(needsWizard || showWizard) && (
         <ProfileWizard onComplete={() => { setShowWizard(false); refetchProfile(); }} />
       )}
