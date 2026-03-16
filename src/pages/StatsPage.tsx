@@ -37,12 +37,10 @@ const StatsPage = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { tdee } = useProfile();
-  const { addMeal } = useMealLogs();
   const [view, setView] = useState<"week" | "month">("week");
   const [data, setData] = useState<DayData[]>([]);
   const [macroData, setMacroData] = useState<MacroData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddMeal, setShowAddMeal] = useState(false);
 
   // Calendar state
   const [calMonth, setCalMonth] = useState(() => {
