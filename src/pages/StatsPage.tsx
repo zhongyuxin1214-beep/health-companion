@@ -19,6 +19,7 @@ interface MacroData {
   protein: number;
   carbs: number;
   fat: number;
+  weight: number | null;
 }
 
 interface CalendarDayInfo {
