@@ -121,7 +121,7 @@ const WorkoutPage = () => {
         </div>
       )}
 
-      <BottomNav onAdd={() => navigate("/")} />
+      <BottomNav />
     </div>
   );
 };
