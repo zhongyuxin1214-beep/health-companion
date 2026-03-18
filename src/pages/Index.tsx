@@ -181,7 +181,7 @@ const Index = () => {
         />
       </div>
 
-      <BottomNav onAdd={() => setShowAddMeal(true)} />
+      <BottomNav />
 
       {/* 弹窗逻辑 */}
       {(needsWizard || showWizard) && (
