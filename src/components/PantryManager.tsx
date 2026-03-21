@@ -14,12 +14,17 @@ const PantryManager = () => {
   useEffect(() => {
     if (!user) return;
     const fetch = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_pantry")
         .select("id, ingredient_name")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-      if (data) setItems(data);
+      if (error) {
+        setItems([]);
+        toast.error(error.message);
+        return;
+      }
+      setItems(data ?? []);
     };
     fetch();
   }, [user]);
@@ -37,7 +42,7 @@ const PantryManager = () => {
       .insert({ user_id: user.id, ingredient_name: name })
       .select("id, ingredient_name")
       .single();
-    if (error) { toast.error("添加失败"); setLoading(false); return; }
+    if (error) { toast.error(error.message); setLoading(false); return; }
     if (data) setItems((prev) => [data, ...prev]);
     setNewItem("");
     setLoading(false);
@@ -45,7 +50,16 @@ const PantryManager = () => {
   };
 
   const removeItem = async (id: string) => {
-    await supabase.from("user_pantry").delete().eq("id", id);
+    if (!user) return;
+    const { error } = await supabase
+      .from("user_pantry")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 

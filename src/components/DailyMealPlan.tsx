@@ -30,7 +30,7 @@ const feedbackOptions = [
 ];
 
 interface DailyMealPlanProps {
-  onQuickAdd?: (meal: { type: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number }) => void;
+  onQuickAdd?: (meal: { type: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number }) => void | Promise<void>;
 }
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -79,11 +79,14 @@ const DailyMealPlan = ({ onQuickAdd }: DailyMealPlanProps) => {
     if (!user) return;
     try {
       // Fetch pantry items
-      const { data: pantryData } = await supabase
+      const { data: pantryData, error: pantryError } = await supabase
         .from("user_pantry")
         .select("ingredient_name")
         .eq("user_id", user.id);
-      const pantryStr = pantryData?.map((p) => p.ingredient_name).join("、") || "";
+      if (pantryError) {
+        toast.error(pantryError.message);
+      }
+      const pantryStr = (pantryData ?? []).map((p) => p.ingredient_name).join("、");
 
       const res = await fetch("/api/generate-plan", {
         method: "POST",
@@ -282,16 +285,16 @@ const MealCard = ({
       </span>
       {onQuickAdd && (
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            onQuickAdd({
+            await Promise.resolve(onQuickAdd({
               type: item.meal,
               name: item.food,
-              calories: item.calories,
-              protein: item.macros?.protein ?? 0,
-              carbs: item.macros?.carbs ?? 0,
-              fat: item.macros?.fat ?? 0,
-            });
+              calories: toNumberOrZero(item.calories),
+              protein: toNumberOrZero(item.macros?.protein),
+              carbs: toNumberOrZero(item.macros?.carbs),
+              fat: toNumberOrZero(item.macros?.fat),
+            }));
           }}
           className="text-[10px] font-bold text-white bg-primary px-2.5 py-1.5 rounded-xl hover:bg-primary/90 active:scale-95 transition-all flex-shrink-0"
         >
@@ -328,6 +331,12 @@ const MacroPill = ({ label, value, unit, color }: { label: string; value?: numbe
       <p className="text-[10px] text-[#1E293B]/60">{label}</p>
     </div>
   );
+};
+
+const toNumberOrZero = (value: unknown) => {
+  if (value === "" || value === undefined || value === null) return 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 export default DailyMealPlan;
