@@ -9,6 +9,15 @@ import { Loader2, Camera, Mic, MicOff, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+type MealInput = {
+  type?: string;
+  name?: string;
+  calories?: unknown;
+  protein?: unknown;
+  carbs?: unknown;
+  fat?: unknown;
+};
+
 const LogPage = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -19,6 +28,12 @@ const LogPage = () => {
   const [listening, setListening] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  const handleCleanAddMeal = async (meal: MealInput) => {
+    const cleaned = sanitizeMealPayload(meal);
+    await addMeal(cleaned);
+    await refetch();
+  };
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -48,16 +63,15 @@ const LogPage = () => {
       if (data.error) throw new Error(data.error);
 
       setRecognizeStatus("正在计算营养成分...");
-      await addMeal({
+      await handleCleanAddMeal({
         type: guessType(),
         name: data.name || "未知食物",
-        calories: Number(data.calories) || 0,
-        protein: Number(data.protein) || 0,
-        carbs: Number(data.carbs) || 0,
-        fat: Number(data.fat) || 0,
+        calories: data.calories,
+        protein: data.protein,
+        carbs: data.carbs,
+        fat: data.fat,
       });
       toast.success(`已记录：${data.name}`);
-      refetch();
     } catch (err: any) {
       toast.error(err.message || "识别失败，请手动输入");
     } finally {
@@ -97,16 +111,15 @@ const LogPage = () => {
         const data = await res.json();
         toast.dismiss();
         if (data.error) throw new Error(data.error);
-        await addMeal({
+        await handleCleanAddMeal({
           type: guessType(),
           name: data.name || text,
-          calories: Number(data.calories) || 0,
-          protein: Number(data.protein) || 0,
-          carbs: Number(data.carbs) || 0,
-          fat: Number(data.fat) || 0,
+          calories: data.calories,
+          protein: data.protein,
+          carbs: data.carbs,
+          fat: data.fat,
         });
         toast.success(`已记录：${data.name || text}`);
-        refetch();
       } catch (err: any) {
         toast.dismiss();
         toast.error(err.message || "解析失败");
@@ -120,7 +133,7 @@ const LogPage = () => {
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("meal_logs").delete().eq("id", id);
-    if (error) { toast.error("删除失败"); return; }
+    if (error) { toast.error(error.message); return; }
     toast.success("已删除");
     refetch();
   };
@@ -141,7 +154,7 @@ const LogPage = () => {
 
       {/* AI Meal Plan */}
       <div className="px-4 mb-5">
-        <DailyMealPlan onQuickAdd={(m) => { addMeal(m); }} />
+        <DailyMealPlan onQuickAdd={handleCleanAddMeal} />
       </div>
 
       {/* Core Input Area */}
@@ -239,7 +252,7 @@ const LogPage = () => {
       {showAddMeal && (
         <AddMealDialog
           onClose={() => setShowAddMeal(false)}
-          onAdd={(m) => { addMeal(m); setShowAddMeal(false); }}
+          onAdd={handleCleanAddMeal}
         />
       )}
     </div>
@@ -254,6 +267,23 @@ function guessType(): string {
   if (h < 14) return "午餐";
   if (h < 20) return "晚餐";
   return "加餐";
+}
+
+function toNumberOrZero(value: unknown): number {
+  if (value === "" || value === undefined || value === null) return 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sanitizeMealPayload(meal: MealInput) {
+  return {
+    type: meal.type || guessType(),
+    name: String(meal.name || "未知食物").trim() || "未知食物",
+    calories: toNumberOrZero(meal.calories),
+    protein: toNumberOrZero(meal.protein),
+    carbs: toNumberOrZero(meal.carbs),
+    fat: toNumberOrZero(meal.fat),
+  };
 }
 
 function compressImage(file: File): Promise<string> {

@@ -9,13 +9,19 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+const toNumberOrZero = (value: unknown) => {
+  if (value === "" || value === undefined || value === null) return 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export const useMealLogs = () => {
   const { user } = useAuth();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchMeals = useCallback(async () => {
-    if (!user) { setLoading(false); return; }
+    if (!user) { setMeals([]); setLoading(false); return; }
     const { data } = await supabase
       .from("meal_logs")
       .select("*")
@@ -29,10 +35,10 @@ export const useMealLogs = () => {
         type: m.type,
         name: m.name,
         calories: m.calories,
-        oilMultiplier: m.oil_multiplier || 1,
-        protein: m.protein || undefined,
-        carbs: m.carbs || undefined,
-        fat: m.fat || undefined,
+        oilMultiplier: m.oil_multiplier ?? 1,
+        protein: m.protein ?? undefined,
+        carbs: m.carbs ?? undefined,
+        fat: m.fat ?? undefined,
       })));
     }
     setLoading(false);
@@ -41,41 +47,47 @@ export const useMealLogs = () => {
   useEffect(() => { fetchMeals(); }, [fetchMeals]);
 
   const addMeal = async (meal: { type: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number }) => {
-    if (!user) return;
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id ?? user?.id;
+    if (!userId) {
+      toast.error("请先登录后再记录");
+      return;
+    }
+
     const { error } = await supabase.from("meal_logs").insert({
-      user_id: user.id,
+      user_id: userId,
       date: todayStr(),
-      type: meal.type,
-      name: meal.name,
-      calories: meal.calories,
-      protein: meal.protein || null,
-      carbs: meal.carbs || null,
-      fat: meal.fat || null,
+      type: meal.type || "加餐",
+      name: meal.name?.trim() || "未命名食物",
+      calories: toNumberOrZero(meal.calories),
+      protein: toNumberOrZero(meal.protein),
+      carbs: toNumberOrZero(meal.carbs),
+      fat: toNumberOrZero(meal.fat),
     });
-    if (error) { toast.error("添加失败"); return; }
+    if (error) { toast.error(error.message); return; }
     toast.success("已添加记录");
-    fetchMeals();
+    await fetchMeals();
   };
 
   const updateMeal = async (id: string, meal: { type: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number }) => {
     const { error } = await supabase.from("meal_logs").update({
-      type: meal.type,
-      name: meal.name,
-      calories: meal.calories,
-      protein: meal.protein || null,
-      carbs: meal.carbs || null,
-      fat: meal.fat || null,
+      type: meal.type || "加餐",
+      name: meal.name?.trim() || "未命名食物",
+      calories: toNumberOrZero(meal.calories),
+      protein: toNumberOrZero(meal.protein),
+      carbs: toNumberOrZero(meal.carbs),
+      fat: toNumberOrZero(meal.fat),
     }).eq("id", id);
-    if (error) { toast.error("更新失败"); return; }
+    if (error) { toast.error(error.message); return; }
     toast.success("已更新记录");
-    fetchMeals();
+    await fetchMeals();
   };
 
   const adjustOil = async (id: string, multiplier: number) => {
     const { error } = await supabase.from("meal_logs").update({ oil_multiplier: multiplier }).eq("id", id);
-    if (error) { toast.error("调整失败"); return; }
+    if (error) { toast.error(error.message); return; }
     toast.success(`油度已校准为 ${multiplier}x`);
-    fetchMeals();
+    await fetchMeals();
   };
 
   const totalConsumed = meals.reduce(

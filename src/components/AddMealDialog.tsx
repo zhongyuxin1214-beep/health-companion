@@ -1,15 +1,21 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Camera, Loader2, Mic, MicOff } from "lucide-react";
+import { X, Camera, Loader2, Mic } from "lucide-react";
 import { toast } from "sonner";
 
 interface AddMealDialogProps {
   onClose: () => void;
-  onAdd: (meal: { type: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number }) => void;
+  onAdd: (meal: { type: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number }) => void | Promise<void>;
   editMeal?: { id: string; type: string; name: string; calories: number } | null;
   prefillMeal?: { type?: string; name: string; calories: number; protein?: number; carbs?: number; fat?: number };
 }
 
 const mealTypes = ["早餐", "午餐", "晚餐", "加餐"];
+
+const toNumberOrZero = (value: unknown) => {
+  if (value === "" || value === undefined || value === null) return 0;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+};
 
 async function recognizeFood(base64Image: string): Promise<any> {
   const res = await fetch("/api/recognize", {
@@ -104,22 +110,27 @@ const AddMealDialog = ({ onClose, onAdd, editMeal, prefillMeal }: AddMealDialogP
     reader.readAsDataURL(file);
   };
 
-const handleSubmit = () => {
-    if (!name || !calories) return;
-    
-    // 数据清洗：确保数值字段不是空字符串，如果是空的则设为 0
+const handleSubmit = async () => {
+    if (!name.trim()) {
+      toast.error("请填写食物名称");
+      return;
+    }
+
     const cleanMeal = {
       type,
-      name,
-      calories: parseInt(calories) || 0,
-      protein: protein ? parseFloat(protein) : 0,
-      carbs: carbs ? parseFloat(carbs) : 0,
-      fat: fat ? parseFloat(fat) : 0,
-      date: new Date().toISOString().split('T')[0] // 确保日期格式正确
+      name: name.trim(),
+      calories: toNumberOrZero(calories),
+      protein: toNumberOrZero(protein),
+      carbs: toNumberOrZero(carbs),
+      fat: toNumberOrZero(fat),
     };
 
-    onAdd(cleanMeal);
-    onClose();
+    try {
+      await Promise.resolve(onAdd(cleanMeal));
+      onClose();
+    } catch (error: any) {
+      toast.error(error?.message || "保存失败");
+    }
   };
 
   return (
