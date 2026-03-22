@@ -155,3 +155,24 @@
     transform: translateY(0) scale(0.98);
   }
 }
+/* 强制提升全局文字对比度 */
+@layer base {
+  .text-muted-foreground {
+    @apply text-slate-600 !important;
+  }
+  
+  /* 针对白色背景上的灰色文字加深 */
+  span, p, label {
+    @apply text-[#1E293B];
+  }
+
+  /* 修复按钮内的文字颜色 */
+  button span {
+    @apply text-inherit;
+  }
+}
+
+/* 统一卡片圆角 */
+.rounded-xl, .rounded-2xl, .rounded-3xl {
+  border-radius: 32px !important;
+}
