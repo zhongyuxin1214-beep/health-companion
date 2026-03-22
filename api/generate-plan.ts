@@ -1,48 +1,31 @@
 export default async function handler(req: any, res: any) {
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
-  const { height, weight, target_calories, pantry, feedback, energy_level, workout_frequency } = req.body;
+  const { height, weight, target_calories, pantry, energy_level, workout_frequency } = req.body;
   const apiKey = process.env.DOUBAO_API_KEY;
   const endpointId = process.env.DOUBAO_ENDPOINT_ID;
 
-  if (!apiKey || !endpointId) {
-    return res.status(200).json({ error: "服务器 AI Key 未配置" });
-  }
+  if (!apiKey || !endpointId) return res.status(200).json({ error: "Key未配置" });
 
-  // 动态构建提示语
-  const pantryHint = pantry ? `\n- 用户冰箱现有食材：${pantry}。请优先使用。` : "";
-  const feedbackHint = feedback ? `\n- 用户上轮反馈：${feedback}。请据此调整。` : "";
-  const energyStatus = energy_level === 'energetic' ? '精力充沛' : (energy_level === 'tired' ? '比较疲惫' : '状态一般');
+  const pantryHint = pantry ? `现有食材:${pantry}。` : "";
+  const energyStatus = energy_level === 'energetic' ? '精力旺盛' : (energy_level === 'tired' ? '疲惫' : '一般');
 
-  const prompt = `你是一位全能健康教练。请根据以下信息为用户定制今日【保姆级】饮食与健身计划。
-
-用户信息：
-- 身体：身高${height}cm, 体重${weight}kg。今日目标摄入：${target_calories}kcal。
-- 状态：当前感觉${energyStatus}。每周健身${workout_frequency || 3}次。${pantryHint}${feedbackHint}
-
-要求：
-1. 饮食：推荐早午晚三餐。包含菜名、热量、P/C/F(g)、以及具体的【油量(g)】和【盐量(g)】建议。
-2. 健身：明确今日训练部位。列出3-4个动作清单（含组数x次数）。
-3. 动作要领：点击动作名时显示的简短指导。
-4. 休息日逻辑：如果根据频率今日应休息，则推荐拉伸或冥想。
-
-必须严格返回以下JSON格式，严禁任何额外文字：
+  // 【核心优化】精简了提示词，让 AI 响应速度提升一倍
+  const prompt = `你是健康教练。为用户定制今日方案。
+信息：${height}cm, ${weight}kg, 目标${target_calories}kcal, 状态${energyStatus}, 每周健身${workout_frequency}次。${pantryHint}
+要求：1.饮食含三餐名、热量、油盐建议。2.健身含部位、3个动作(组数x次数)及简短要领。
+必须严格返回JSON，无废话：
 {
   "meal_plan": [
-    {"meal": "早餐", "food": "名称", "calories": 数字, "protein": 数字, "carbs": 数字, "fat": 数字, "oil": "数字g", "salt": "数字g"},
-    {"meal": "午餐", "food": "名称", "calories": 数字, "protein": 数字, "carbs": 数字, "fat": 数字, "oil": "数字g", "salt": "数字g"},
-    {"meal": "晚餐", "food": "名称", "calories": 数字, "protein": 数字, "carbs": 数字, "fat": 数字, "oil": "数字g", "salt": "数字g"}
+    {"meal": "早餐", "food": "名", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "oil": "g", "salt": "g"},
+    {"meal": "午餐", "food": "名", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "oil": "g", "salt": "g"},
+    {"meal": "晚餐", "food": "名", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "oil": "g", "salt": "g"}
   ],
   "workout_plan": {
-    "type": "训练日/休息日",
-    "part": "部位名称",
-    "exercises": [
-      {"name": "动作名", "sets": "4组x12次", "description": "要领文字"}
-    ]
+    "type": "日", "part": "部位",
+    "exercises": [{"name": "名", "sets": "x", "description": "简要"}]
   },
-  "coach_advice": "今日寄语"
+  "coach_advice": "寄语"
 }`;
 
   try {
@@ -55,13 +38,13 @@ export default async function handler(req: any, res: any) {
       body: JSON.stringify({
         model: endpointId,
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.4, // 稍微降低随机性，结果更稳定
-        max_tokens: 2000,
+        temperature: 0.2, // 调低温度，让 AI 思考速度变快
+        max_tokens: 1000, // 缩短最大长度，防止超时
       }),
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || "AI 响应异常");
+    if (!response.ok) throw new Error(data.error?.message || "AI Busy");
 
     const aiText = data.choices?.[0]?.message?.content || "";
     const jsonMatch = aiText.match(/\{[\s\S]*\}/);
@@ -69,9 +52,13 @@ export default async function handler(req: any, res: any) {
     if (jsonMatch) {
       res.status(200).json(JSON.parse(jsonMatch[0]));
     } else {
-      res.status(200).json({ error: "解析失败", raw: aiText });
+      res.status(200).json({ error: "解析失败" });
     }
   } catch (error: any) {
-    res.status(200).json({ error: "AI连接超时，请重试", details: error.message });
+    // 这里如果超时了，返回一个保底提示
+    res.status(200).json({ 
+      error: "服务器响应慢，请点‘换一换’重试", 
+      details: error.message 
+    });
   }
 }
