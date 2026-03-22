@@ -5,27 +5,17 @@ import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
 
-import { Loader2, TrendingUp, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from "recharts";
+import { Loader2, TrendingUp, ChevronLeft, ChevronRight, X, Info } from "lucide-react";
+import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Legend } from "recharts";
 
 interface DayData {
   date: string;
+  displayDate: string;
   calories: number;
   weight: number | null;
-}
-
-interface MacroData {
-  date: string;
   protein: number;
   carbs: number;
   fat: number;
-  weight: number | null;
-}
-
-interface CalendarDayInfo {
-  date: string;
-  calories: number;
-  status: "under" | "over" | "none";
 }
 
 interface DayDetail {
@@ -37,10 +27,9 @@ interface DayDetail {
 const StatsPage = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { tdee } = useProfile();
+  const { tdee, profile } = useProfile();
   const [view, setView] = useState<"week" | "month">("week");
-  const [data, setData] = useState<DayData[]>([]);
-  const [macroData, setMacroData] = useState<MacroData[]>([]);
+  const [statsData, setStatsData] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Calendar state
@@ -49,7 +38,6 @@ const StatsPage = () => {
     return { year: now.getFullYear(), month: now.getMonth() };
   });
   const [calData, setCalData] = useState<Map<string, number>>(new Map());
-  const [calLoading, setCalLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<DayDetail | null>(null);
 
   useEffect(() => {
@@ -61,92 +49,83 @@ const StatsPage = () => {
     setLoading(true);
     const days = view === "week" ? 7 : 30;
     const since = new Date();
-    since.setDate(since.getDate() - days);
+    since.setDate(since.getDate() - (days - 1));
     const sinceStr = since.toISOString().slice(0, 10);
 
     const [mealRes, weightRes] = await Promise.all([
-      supabase.from("meal_logs").select("date, calories, oil_multiplier, protein, carbs, fat").eq("user_id", user.id).gte("date", sinceStr).order("date"),
-      supabase.from("daily_body_logs").select("date, weight").eq("user_id", user.id).gte("date", sinceStr).order("date"),
+      supabase.from("meal_logs")
+        .select("date, calories, protein, carbs, fat")
+        .eq("user_id", user.id)
+        .gte("date", sinceStr)
+        .order("date"),
+      supabase.from("daily_body_logs")
+        .select("date, weight")
+        .eq("user_id", user.id)
+        .gte("date", sinceStr)
+        .order("date"),
     ]);
 
-    const calMap = new Map<string, number>();
-    const macroMap = new Map<string, { protein: number; carbs: number; fat: number }>();
+    // 数据聚合逻辑
+    const dataMap = new Map<string, DayData>();
+    
+    // 生成连续日期序列
+    for (let i = 0; i < days; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      const dStr = d.toISOString().slice(0, 10);
+      dataMap.set(dStr, {
+        date: dStr,
+        displayDate: dStr.slice(5),
+        calories: 0,
+        weight: null,
+        protein: 0,
+        carbs: 0,
+        fat: 0
+      });
+    }
 
     (mealRes.data || []).forEach((l) => {
-      const cal = Math.round(l.calories * (l.oil_multiplier || 1));
-      calMap.set(l.date, (calMap.get(l.date) || 0) + cal);
-
-      const existing = macroMap.get(l.date) || { protein: 0, carbs: 0, fat: 0 };
-      existing.protein += l.protein || 0;
-      existing.carbs += l.carbs || 0;
-      existing.fat += l.fat || 0;
-      macroMap.set(l.date, existing);
+      const existing = dataMap.get(l.date);
+      if (existing) {
+        existing.calories += l.calories || 0;
+        existing.protein += l.protein || 0;
+        existing.carbs += l.carbs || 0;
+        existing.fat += l.fat || 0;
+      }
     });
 
-    const wtMap = new Map<string, number>();
-    (weightRes.data || []).forEach((w) => wtMap.set(w.date, w.weight));
+    (weightRes.data || []).forEach((w) => {
+      const existing = dataMap.get(w.date);
+      if (existing) existing.weight = w.weight;
+    });
 
-    const allDates = new Set([...calMap.keys(), ...wtMap.keys()]);
-    const sorted = Array.from(allDates).sort();
-    setData(sorted.map((d) => ({ date: d.slice(5), calories: calMap.get(d) || 0, weight: wtMap.get(d) ?? null })));
-
-    // Macro trend data
-    const macroSorted = Array.from(macroMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-    setMacroData(macroSorted.map(([d, m]) => ({
-      date: d.slice(5),
-      protein: Math.round(m.protein),
-      carbs: Math.round(m.carbs),
-      fat: Math.round(m.fat),
-      weight: wtMap.get(d) ?? null,
-    })));
-
+    setStatsData(Array.from(dataMap.values()));
+    
+    // 同步更新日历总数据
+    const calMap = new Map<string, number>();
+    Array.from(dataMap.values()).forEach(d => calMap.set(d.date, d.calories));
+    setCalData(calMap);
+    
     setLoading(false);
   }, [user, view]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Calendar data
-  const fetchCalendarData = useCallback(async () => {
-    if (!user) return;
-    setCalLoading(true);
-    const firstDay = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, "0")}-01`;
-    const lastDate = new Date(calMonth.year, calMonth.month + 1, 0);
-    const lastDay = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, "0")}-${String(lastDate.getDate()).padStart(2, "0")}`;
-
-    const { data: meals } = await supabase
-      .from("meal_logs")
-      .select("date, calories, oil_multiplier")
-      .eq("user_id", user.id)
-      .gte("date", firstDay)
-      .lte("date", lastDay);
-
-    const map = new Map<string, number>();
-    (meals || []).forEach((m) => {
-      const cal = Math.round(m.calories * (m.oil_multiplier || 1));
-      map.set(m.date, (map.get(m.date) || 0) + cal);
-    });
-    setCalData(map);
-    setCalLoading(false);
-  }, [user, calMonth]);
-
-  useEffect(() => { fetchCalendarData(); }, [fetchCalendarData]);
-
   const fetchDayDetail = async (dateStr: string) => {
     if (!user) return;
     const { data: meals } = await supabase
       .from("meal_logs")
-      .select("name, type, calories, oil_multiplier, protein, carbs, fat")
+      .select("name, type, calories, protein, carbs, fat")
       .eq("user_id", user.id)
-      .eq("date", dateStr)
-      .order("created_at");
+      .eq("date", dateStr);
 
     const mealList = (meals || []).map((m) => ({
       name: m.name,
       type: m.type,
-      calories: Math.round(m.calories * (m.oil_multiplier || 1)),
-      protein: m.protein || undefined,
-      carbs: m.carbs || undefined,
-      fat: m.fat || undefined,
+      calories: Math.round(m.calories),
+      protein: m.protein,
+      carbs: m.carbs,
+      fat: m.fat,
     }));
 
     setSelectedDay({
@@ -156,304 +135,128 @@ const StatsPage = () => {
     });
   };
 
-  const avgCal = data.length > 0 ? Math.round(data.reduce((s, d) => s + d.calories, 0) / data.length) : 0;
-  const weights = data.filter((d) => d.weight !== null).map((d) => d.weight as number);
-  const weightDelta = weights.length >= 2 ? (weights[weights.length - 1] - weights[0]).toFixed(1) : null;
+  const prevMonth = () => setCalMonth(p => p.month === 0 ? { year: p.year - 1, month: 11 } : { ...p, month: p.month - 1 });
+  const nextMonth = () => setCalMonth(p => p.month === 11 ? { year: p.year + 1, month: 0 } : { ...p, month: p.month + 1 });
 
-  // Macro averages for AI comment
-  const avgP = macroData.length > 0 ? Math.round(macroData.reduce((s, d) => s + d.protein, 0) / macroData.length) : 0;
-  const avgC = macroData.length > 0 ? Math.round(macroData.reduce((s, d) => s + d.carbs, 0) / macroData.length) : 0;
-  const avgF = macroData.length > 0 ? Math.round(macroData.reduce((s, d) => s + d.fat, 0) / macroData.length) : 0;
-
-  const getMacroComment = () => {
-    if (macroData.length === 0) return null;
-    const parts: string[] = [];
-    if (avgP >= 80) parts.push("蛋白质摄入达标👍");
-    else parts.push("蛋白质偏低，建议增加鸡胸/鱼/蛋");
-    if (avgC > 250) parts.push("碳水略高，建议减少米面");
-    else parts.push("碳水控制良好");
-    if (avgF > 70) parts.push("脂肪偏高，注意控油");
-    else parts.push("脂肪摄入合理");
-    return parts.join("，");
-  };
-
-  // Calendar helpers
-  const daysInMonth = new Date(calMonth.year, calMonth.month + 1, 0).getDate();
-  const firstDayOfWeek = new Date(calMonth.year, calMonth.month, 1).getDay();
-  const monthLabel = `${calMonth.year}年${calMonth.month + 1}月`;
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  const prevMonth = () => {
-    setCalMonth((p) => p.month === 0 ? { year: p.year - 1, month: 11 } : { ...p, month: p.month - 1 });
-  };
-  const nextMonth = () => {
-    setCalMonth((p) => p.month === 11 ? { year: p.year + 1, month: 0 } : { ...p, month: p.month + 1 });
-  };
-
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-secondary" />
-      </div>
-    );
-  }
+  if (authLoading || !user) return null;
 
   return (
-    <div className="min-h-screen bg-background max-w-md mx-auto relative pb-32">
-      <div className="px-4 pt-12 pb-4">
-        <h1 className="text-2xl font-extrabold text-foreground flex items-center gap-2">
-          <TrendingUp className="w-6 h-6 text-secondary" /> 趋势分析
+    <div className="min-h-screen bg-[#F8FAFC] max-w-md mx-auto relative pb-40 overflow-y-auto no-scrollbar">
+      <div className="px-6 pt-12 pb-4">
+        <h1 className="text-2xl font-black text-[#1E293B] flex items-center gap-2">
+          <TrendingUp className="w-7 h-7 text-[#3B82F6]" /> 趋势分析
         </h1>
       </div>
 
-      {/* Period toggle */}
-      <div className="mx-4 flex gap-2 mb-5">
+      {/* 视图切换 */}
+      <div className="mx-6 flex gap-2 mb-6">
         {(["week", "month"] as const).map((v) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              view === v ? "gradient-teal text-secondary-foreground shadow-glow-teal" : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {v === "week" ? "近 7 天" : "近 30 天"}
-          </button>
+          <button key={v} onClick={() => setView(v)}
+            className={`flex-1 py-3 rounded-2xl text-xs font-black tracking-widest uppercase transition-all ${
+              view === v ? "bg-[#3B82F6] text-white shadow-lg shadow-blue-200" : "bg-white text-slate-400"
+            }`}>{v === "week" ? "近 7 天" : "近 30 天"}</button>
         ))}
       </div>
 
-      {/* Calories + Weight Chart */}
-      <div className="mx-4 bg-card rounded-2xl p-4 shadow-card-lg border border-border">
-        <div className="flex gap-4 mb-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-secondary/70" />
-            <span>热量 (kcal)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-1 rounded-full bg-primary" />
-            <span>体重 (kg)</span>
-          </div>
-        </div>
-
-        <div className="h-56">
-          {loading ? (
-            <div className="h-full flex items-center justify-center">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : data.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              暂无数据，开始记录后将显示趋势
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
-                <YAxis yAxisId="cal" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
-                <YAxis yAxisId="wt" orientation="right" domain={["dataMin - 1", "dataMax + 1"]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "16px",
-                    fontSize: "12px",
-                    color: "hsl(var(--foreground))",
-                  }}
-                />
-                <Bar yAxisId="cal" dataKey="calories" fill="hsl(var(--secondary) / 0.7)" radius={[8, 8, 0, 0]} />
-                <Line yAxisId="wt" type="monotone" dataKey="weight" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ fill: "hsl(var(--primary))", r: 4 }} connectNulls />
-              </ComposedChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-border space-y-1.5">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>每日目标</span>
-            <span className="font-bold text-secondary">{tdee} kcal</span>
-          </div>
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{view === "week" ? "本周" : "本月"}平均摄入</span>
-            <span className="font-bold text-foreground">{avgCal} kcal</span>
-          </div>
-          {weightDelta !== null && (
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>体重变化</span>
-              <span className={`font-bold ${parseFloat(weightDelta) <= 0 ? "text-secondary" : "text-primary"}`}>
-                {parseFloat(weightDelta) > 0 ? "+" : ""}{weightDelta} kg
-              </span>
-            </div>
-          )}
+      {/* 核心图表 1：热量与体重 */}
+      <div className="mx-6 bg-white rounded-[32px] p-6 shadow-sm border border-slate-50 mb-6">
+        <p className="text-[10px] text-slate-400 font-black tracking-widest uppercase mb-6 text-center">热量摄入 vs 体重趋势</p>
+        <div className="h-64 -ml-6">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={statsData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+              <XAxis dataKey="displayDate" fontSize={10} tickLine={false} axisLine={false} tick={{fill: '#64748B', fontWeight: 700}} />
+              <YAxis yAxisId="left" hide />
+              <YAxis yAxisId="right" orientation="right" fontSize={10} tickLine={false} axisLine={false} domain={['dataMin - 1', 'dataMax + 1']} tick={{fill: '#3B82F6', fontWeight: 800}} />
+              <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+              <Bar yAxisId="left" dataKey="calories" fill="#10B981" opacity={0.6} radius={[6, 6, 0, 0]} barSize={16} />
+              <Line yAxisId="right" type="monotone" dataKey="weight" stroke="#3B82F6" strokeWidth={4} dot={{ r: 4, fill: '#3B82F6', strokeWidth: 2, stroke: '#fff' }} connectNulls />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Macro Trends Chart */}
-      {macroData.length > 0 && (
-        <div className="mx-4 mt-4 bg-card rounded-2xl p-4 shadow-card-lg border border-border">
-          <h3 className="font-bold text-sm text-[#1E293B] mb-3">宏量营养素趋势</h3>
-          <div className="flex flex-wrap gap-3 mb-3 text-xs text-[#1E293B]/70">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-muted" />
-              <span>体重(kg)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-1 rounded-full bg-primary" />
-              <span>蛋白质</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-1 rounded-full bg-secondary" />
-              <span>碳水</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-1 rounded-full bg-accent" />
-              <span>脂肪</span>
-            </div>
-          </div>
-
-          <div className="h-52">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={macroData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#1E293B" }} stroke="hsl(var(--border))" />
-                <YAxis yAxisId="macro" tick={{ fontSize: 10, fill: "#1E293B" }} stroke="hsl(var(--border))" />
-                <YAxis yAxisId="wt" orientation="right" domain={["dataMin - 1", "dataMax + 1"]} tick={{ fontSize: 10, fill: "#1E293B" }} stroke="hsl(var(--border))" />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "16px",
-                    fontSize: "12px",
-                    color: "#1E293B",
-                  }}
-                  formatter={(value: number, name: string) => {
-                    const labels: Record<string, string> = { protein: "蛋白质", carbs: "碳水", fat: "脂肪", weight: "体重" };
-                    const unit = name === "weight" ? "kg" : "g";
-                    return [`${value}${unit}`, labels[name] || name];
-                  }}
-                />
-                <Bar yAxisId="wt" dataKey="weight" fill="hsl(var(--muted))" radius={[6, 6, 0, 0]} opacity={0.5} />
-                <Line yAxisId="macro" type="monotone" dataKey="protein" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                <Line yAxisId="macro" type="monotone" dataKey="carbs" stroke="hsl(var(--secondary))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                <Line yAxisId="macro" type="monotone" dataKey="fat" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Macro averages + AI comment */}
-          <div className="mt-3 pt-3 border-t border-border space-y-1.5">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>日均 P/C/F</span>
-              <span className="font-bold text-foreground">{avgP}g / {avgC}g / {avgF}g</span>
-            </div>
-            {getMacroComment() && (
-              <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">
-                💡 {getMacroComment()}
-              </p>
-            )}
-          </div>
+      {/* 核心图表 2：三大营养素趋势 */}
+      <div className="mx-6 bg-white rounded-[32px] p-6 shadow-sm border border-slate-50 mb-6">
+        <p className="text-[10px] text-slate-400 font-black tracking-widest uppercase mb-6 text-center">宏量营养素摄入趋势</p>
+        <div className="h-64 -ml-6">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={statsData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+              <XAxis dataKey="displayDate" fontSize={10} tickLine={false} axisLine={false} tick={{fill: '#64748B', fontWeight: 700}} />
+              <YAxis fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+              <Legend verticalAlign="top" iconType="circle" wrapperStyle={{paddingBottom: '20px', fontSize: '10px', fontWeight: 800}} />
+              {/* 体重作为淡色背景条形图 */}
+              <Bar dataKey="weight" fill="#E2E8F0" opacity={0.3} barSize={20} name="体重参考" />
+              <Line type="monotone" dataKey="protein" stroke="#10B981" strokeWidth={3} dot={false} name="蛋白质(g)" />
+              <Line type="monotone" dataKey="carbs" stroke="#3B82F6" strokeWidth={3} dot={false} name="碳水(g)" />
+              <Line type="monotone" dataKey="fat" stroke="#F97316" strokeWidth={3} dot={false} name="脂肪(g)" />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
-      )}
+      </div>
 
-      {/* Monthly Calendar */}
-      <div className="mx-4 mt-4 bg-card rounded-2xl p-4 shadow-card-lg border border-border">
-        <div className="flex items-center justify-between mb-3">
-          <button onClick={prevMonth} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center hover:bg-border transition-colors">
-            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-          </button>
-          <h3 className="font-bold text-sm text-foreground">{monthLabel}</h3>
-          <button onClick={nextMonth} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center hover:bg-border transition-colors">
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
+      {/* 月度健康日历 */}
+      <div className="mx-6 bg-white rounded-[32px] p-6 shadow-sm border border-slate-50 mb-10">
+        <div className="flex items-center justify-between mb-6">
+          <button onClick={prevMonth} className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center"><ChevronLeft className="w-5 h-5 text-slate-400" /></button>
+          <h3 className="font-black text-[#1E293B]">{calMonth.year}年{calMonth.month + 1}月</h3>
+          <button onClick={nextMonth} className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center"><ChevronRight className="w-5 h-5 text-slate-400" /></button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 mb-1">
-          {["日", "一", "二", "三", "四", "五", "六"].map((d) => (
-            <div key={d} className="text-center text-[10px] text-muted-foreground font-semibold py-1">{d}</div>
+        <div className="grid grid-cols-7 gap-2">
+          {["日", "一", "二", "三", "四", "五", "六"].map(d => (
+            <div key={d} className="text-center text-[10px] font-black text-slate-300 uppercase pb-2">{d}</div>
           ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-            <div key={`empty-${i}`} />
-          ))}
-          {Array.from({ length: daysInMonth }).map((_, i) => {
+          {Array.from({ length: new Date(calMonth.year, calMonth.month, 1).getDay() }).map((_, i) => <div key={i} />)}
+          {Array.from({ length: new Date(calMonth.year, calMonth.month + 1, 0).getDate() }).map((_, i) => {
             const day = i + 1;
-            const dateStr = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-            const cal = calData.get(dateStr);
-            const isToday = dateStr === todayStr;
-            const isFuture = dateStr > todayStr;
-
-            let bgClass = "bg-muted";
-            if (!isFuture && cal !== undefined && cal > 0) {
-              bgClass = cal <= tdee ? "bg-secondary/30" : "bg-primary/30";
-            }
+            const dStr = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const cal = calData.get(dStr);
+            const isTargetMet = cal !== undefined && cal > 0 && cal <= (tdee || 2000);
+            const isOver = cal !== undefined && cal > (tdee || 2000);
 
             return (
-              <button
-                key={day}
-                onClick={() => !isFuture && cal !== undefined && fetchDayDetail(dateStr)}
-                disabled={isFuture || cal === undefined}
-                className={`aspect-square rounded-lg flex items-center justify-center text-xs font-semibold transition-all ${bgClass} ${
-                  isToday ? "ring-2 ring-secondary" : ""
-                } ${isFuture || cal === undefined ? "opacity-40 cursor-default" : "hover:opacity-80 cursor-pointer"}`}
-              >
-                <span className={isToday ? "text-secondary font-extrabold" : "text-foreground"}>{day}</span>
+              <button key={day} onClick={() => cal && fetchDayDetail(dStr)}
+                className={`aspect-square rounded-2xl flex flex-col items-center justify-center relative transition-all ${
+                  isTargetMet ? "bg-emerald-500 text-white shadow-lg shadow-emerald-100" : 
+                  isOver ? "bg-rose-500 text-white shadow-lg shadow-rose-100" : "bg-slate-50 text-slate-400"
+                }`}>
+                <span className="text-xs font-black">{day}</span>
+                {cal !== undefined && cal > 0 && <span className="text-[7px] font-bold mt-0.5 opacity-80">{cal}</span>}
               </button>
             );
           })}
         </div>
-
-        <div className="flex gap-4 mt-3 pt-2 border-t border-border justify-center text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-sm bg-secondary/30" />
-            <span>达标 (≤ {tdee})</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-sm bg-primary/30" />
-            <span>超标</span>
-          </div>
-        </div>
       </div>
 
-      {/* Day detail popup */}
+      {/* 详情弹窗 */}
       {selectedDay && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 animate-in fade-in" onClick={() => setSelectedDay(null)}>
-           <div className="w-full max-w-md bg-card rounded-t-3xl p-5 pb-8 shadow-card-lg animate-in slide-in-from-bottom max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-foreground">{selectedDay.date} 饮食明细</h3>
-              <button onClick={() => setSelectedDay(null)} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-[#1E293B]/20 backdrop-blur-sm" onClick={() => setSelectedDay(null)}>
+           <div className="w-full max-w-md bg-white rounded-t-[40px] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-black text-[#1E293B]">{selectedDay.date} 摄入明细</h3>
+              <button onClick={() => setSelectedDay(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center"><X className="w-5 h-5 text-slate-400" /></button>
             </div>
-            {selectedDay.meals.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">该日暂无饮食记录</p>
-            ) : (
-              <div className="space-y-2">
-                {selectedDay.meals.map((m, i) => (
-                  <div key={i} className="bg-muted rounded-xl px-4 py-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground font-semibold">{m.type}</p>
-                        <p className="text-sm font-semibold text-foreground">{m.name}</p>
-                      </div>
-                      <span className="text-sm font-extrabold text-primary tabular-nums">{m.calories} kcal</span>
+            <div className="space-y-4">
+              {selectedDay.meals.map((m, i) => (
+                <div key={i} className="bg-slate-50 rounded-3xl p-5 border border-slate-100">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{m.type}</p>
+                      <p className="font-bold text-[#1E293B]">{m.name}</p>
                     </div>
-                    {(m.protein || m.carbs || m.fat) && (
-                      <div className="flex gap-3 mt-1.5">
-                        {m.protein != null && <span className="text-[10px] text-primary font-bold">P {m.protein}g</span>}
-                        {m.carbs != null && <span className="text-[10px] text-secondary font-bold">C {m.carbs}g</span>}
-                        {m.fat != null && <span className="text-[10px] text-accent font-bold">F {m.fat}g</span>}
-                      </div>
-                    )}
+                    <span className="font-black text-sm text-[#10B981]">{m.calories} kcal</span>
                   </div>
-                ))}
-                <div className="flex justify-between pt-2 border-t border-border text-xs text-muted-foreground">
-                  <span>当日总计</span>
-                  <span className={`font-bold ${selectedDay.totalCalories <= tdee ? "text-secondary" : "text-primary"}`}>
-                    {selectedDay.totalCalories} kcal
-                  </span>
+                  <div className="flex gap-4">
+                    <span className="text-[11px] font-bold text-emerald-600">P {m.protein || 0}g</span>
+                    <span className="text-[11px] font-bold text-blue-600">C {m.carbs || 0}g</span>
+                    <span className="text-[11px] font-bold text-orange-600">F {m.fat || 0}g</span>
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         </div>
       )}
